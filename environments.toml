@@ -81,9 +81,29 @@ name = "levai"
 default = true
 
 [staging.contracts]
-# LockedIn deployed to testnet
+# Loktin core (Plans / Cycles)
 [staging.contracts.lockedin]
-id = "CDY27OY75HQOBGNJPOOQICPFLUZLUIVHLA5FVY56ZUYGKGQKC2TZ7LUI"
+id = "CBCKKGNNNFSMTE2IPVGA5YUHSTIN4XX5MQ7LZN4MCPHAKATHWZODGXJN"
+client = true
+
+# USDC test token (7 decimals)
+[staging.contracts.usdc]
+id = "CCD6TIYLX2PJPFWW2RBNZHAUJPMJVECIPVCILF2NYZWR5GYYDXRM4WHM"
+client = false
+
+# Target Savings — goal-based vaults with periodic deposits
+[staging.contracts.target_savings]
+id = "CAF4L2VNNCUMBGBSHXLHGKLPPKBSF65GGXDQQIBDF4IGJWXPPBOEDBAF"
+client = true
+
+# Locked Vault — fixed-term USDC locks with tiered APY
+[staging.contracts.locked_vault]
+id = "CCXMCHYO2JGPHYSJQ7ZJWAXR2SZKM2RZECOCI7R234FYS3JCGHSD5WSR"
+client = true
+
+# Spend & Save — auto-savings with day-28 withdrawals
+[staging.contracts.spend_save]
+id = "CBM3XGPO7LDF56OL7EMRAFFLKLZWHFFZZEBAJGAGMD5KJYXQAALTBQPO"
 client = true
 
 ### Production environment configuration

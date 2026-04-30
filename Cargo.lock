@@ -770,6 +770,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
+name = "locked_vault"
+version = "0.0.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-xdr",
+]
+
+[[package]]
 name = "lockedin"
 version = "0.0.1"
 dependencies = [
@@ -1329,6 +1337,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "spend_save"
+version = "0.0.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-xdr",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1450,6 +1466,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "target_savings"
+version = "0.0.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-xdr",
 ]
 
 [[package]]

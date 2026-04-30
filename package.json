@@ -1,5 +1,5 @@
 {
-  "name": "scaffold-stellar-frontend",
+  "name": "loktin",
   "type": "module",
   "version": "0.0.1",
   "private": true,
@@ -18,14 +18,19 @@
   ],
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^1.9.5",
-    "@stellar/design-system": "^3.1.5",
     "@stellar/stellar-sdk": "^14.2.0",
     "@stellar/stellar-xdr-json": "^23.0.0",
+    "@supabase/supabase-js": "^2.105.1",
     "@tanstack/react-query": "^5.90.2",
+    "framer-motion": "^12.38.0",
+    "locked_vault": "^0.0.0",
     "lossless-json": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.3",
+    "recharts": "^3.8.1",
+    "spend_save": "^0.0.0",
+    "target_savings": "^0.0.0",
     "zod": "^4.1.11"
   },
   "devDependencies": {

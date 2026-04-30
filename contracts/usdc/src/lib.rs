@@ -16,8 +16,11 @@ pub struct USDC;
 #[contractimpl]
 impl USDC {
     pub fn __constructor(e: &Env, recipient: Address, owner: Address) {
-        Base::set_metadata(e, 18, String::from_str(e, "USDC"), String::from_str(e, "USDC"));
-        Base::mint(e, &recipient, 50000000000000000000000000);
+        // 7 decimals to match canonical Stellar USDC and the frontend convention
+        // (10_000_000 stroops per 1 USDC)
+        Base::set_metadata(e, 7, String::from_str(e, "USDC"), String::from_str(e, "USDC"));
+        // Mint 100 million USDC (10^8 * 10^7) to recipient
+        Base::mint(e, &recipient, 1_000_000_000_000_000);
         ownable::set_owner(e, &owner);
     }
 
