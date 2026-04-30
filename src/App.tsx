@@ -1,76 +1,33 @@
-import { Button, Icon, Layout } from "@stellar/design-system";
-import "./App.module.css";
-import ConnectAccount from "./components/ConnectAccount.tsx";
-import { Routes, Route, Outlet, NavLink } from "react-router-dom";
-import Home from "./pages/Home";
-import Debugger from "./pages/Debugger.tsx";
-import Dashboard from "./pages/Dashboard";
+import { Routes, Route, Navigate } from "react-router-dom";
+import AppLayout from "./shared/layout/AppLayout";
+import DashboardLayout from "./shared/layout/DashboardLayout";
+import Landing from "./pages/Landing";
+import Overview from "./pages/dashboard/Overview";
+import Plans from "./pages/dashboard/Plans";
+import Targets from "./pages/dashboard/Targets";
+import Locked from "./pages/dashboard/Locked";
+import SpendSave from "./pages/dashboard/SpendSave";
+import Analytics from "./pages/Analytics";
+import Profile from "./pages/Profile";
+import Templates from "./pages/Templates";
 
-const AppLayout: React.FC = () => (
-  <main>
-    <Layout.Header
-      projectId="LockedIn"
-      projectTitle="LockedIn"
-      contentRight={
-        <>
-          <nav style={{ display: "flex", gap: "1rem" }}>
-            <NavLink to="/dashboard" style={{ textDecoration: "none" }}>
-              {({ isActive }) => (
-                <Button
-                  variant="tertiary"
-                  size="md"
-                  disabled={isActive}
-                >
-                  <Icon.Home01 size="md" />
-                  Dashboard
-                </Button>
-              )}
-            </NavLink>
-            <NavLink to="/debug" style={{ textDecoration: "none" }}>
-              {({ isActive }) => (
-                <Button
-                  variant="tertiary"
-                  size="md"
-                  disabled={isActive}
-                >
-                  <Icon.Code02 size="md" />
-                  Debugger
-                </Button>
-              )}
-            </NavLink>
-          </nav>
-          <ConnectAccount />
-        </>
-      }
-    />
-    <Outlet />
-    <Layout.Footer>
-      <span>
-        © {new Date().getFullYear()} LockedIn. Licensed under the{" "}
-        <a
-          href="http://www.apache.org/licenses/LICENSE-2.0"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Apache License, Version 2.0
-        </a>
-        .
-      </span>
-    </Layout.Footer>
-  </main>
-);
-
-function App() {
+export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<Landing />} />
       <Route element={<AppLayout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/debug" element={<Debugger />} />
-        <Route path="/debug/:contractName" element={<Debugger />} />
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<Overview />} />
+          <Route path="plans" element={<Plans />} />
+          <Route path="targets" element={<Targets />} />
+          <Route path="locked" element={<Locked />} />
+          <Route path="spend-save" element={<SpendSave />} />
+        </Route>
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="/templates" element={<Templates />} />
+        <Route path="/profile" element={<Profile />} />
       </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
-
-export default App;
