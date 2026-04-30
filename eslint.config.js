@@ -13,6 +13,7 @@ export default tseslint.config(
     "dist",
     "packages",
     "docs",
+    "keeper",
     "src/contracts/*",
     "!src/contracts/util.ts",
   ]),

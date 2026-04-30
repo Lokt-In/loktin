@@ -1,88 +1,93 @@
-import cron from 'node-cron';
-import dotenv from 'dotenv';
-import { Keypair } from '@stellar/stellar-sdk';
-import { initializeContract, processDueBills } from './payment.js';
+import dotenv from "dotenv";
+import { Keypair } from "@stellar/stellar-sdk";
+import {
+  initializeContract,
+  initializeTargetSavings,
+} from "./payment/client.js";
+import { startScheduler, runAllOnce } from "./core/scheduler.js";
 
 dotenv.config();
 
+// ── Validate env ──────────────────────────────────────────────────
 const requiredEnvVars = [
-  'ADMIN_SECRET_KEY',
-  'CONTRACT_ID',
-  'RPC_URL',
-  'NETWORK_PASSPHRASE',
-];
+  "ADMIN_SECRET_KEY",
+  "CONTRACT_ID",
+  "RPC_URL",
+  "NETWORK_PASSPHRASE",
+] as const;
 
-for (const varName of requiredEnvVars) {
-  if (!process.env[varName]) {
-    console.error(`❌ Missing required environment variable: ${varName}`);
-    console.error('Please create a .env file based on .env.example');
+for (const v of requiredEnvVars) {
+  if (!process.env[v]) {
+    console.error(`❌ Missing required env: ${v}`);
+    console.error("   Create a .env file based on .env.example");
     process.exit(1);
   }
 }
 
+// ── Init keypair ──────────────────────────────────────────────────
 let adminKeypair: Keypair;
 try {
   adminKeypair = Keypair.fromSecret(process.env.ADMIN_SECRET_KEY!);
-  console.log(`✅ Admin public key: ${adminKeypair.publicKey()}\n`);
-} catch (error) {
-  console.error('❌ Invalid admin secret key');
+} catch {
+  console.error("❌ Invalid admin secret key");
   process.exit(1);
 }
 
-const contract = initializeContract(
+// Plans (existing) contract
+const loktinContract = initializeContract(
   process.env.ADMIN_SECRET_KEY!,
   process.env.CONTRACT_ID!,
   process.env.RPC_URL!,
-  process.env.NETWORK_PASSPHRASE!
+  process.env.NETWORK_PASSPHRASE!,
 );
 
-console.log('🔒 LockedIn Keeper Service');
-console.log('==========================\n');
-console.log(`Contract ID: ${process.env.CONTRACT_ID}`);
-console.log(`Network: ${process.env.STELLAR_NETWORK || 'TESTNET'}`);
-console.log(`RPC URL: ${process.env.RPC_URL}`);
+// Target Savings (new). Optional — only register the job if env var is set.
+const targetSavingsId = process.env.TARGET_SAVINGS_CONTRACT_ID;
+const targetSavingsContract = targetSavingsId
+  ? initializeTargetSavings(
+      process.env.ADMIN_SECRET_KEY!,
+      targetSavingsId,
+      process.env.RPC_URL!,
+      process.env.NETWORK_PASSPHRASE!,
+    )
+  : null;
 
-const cronSchedule = process.env.CRON_SCHEDULE || '0 12 * * *';
-console.log(`Cron Schedule: ${cronSchedule}`);
-console.log(`(Next run: ${cron.validate(cronSchedule) ? 'valid schedule' : 'INVALID SCHEDULE'})\n`);
+// ── Banner ────────────────────────────────────────────────────────
+console.log("┌─────────────────────────────────┐");
+console.log("│   LOKTIN — Keeper Service       │");
+console.log("└─────────────────────────────────┘");
+console.log(`  Admin:           ${adminKeypair.publicKey()}`);
+console.log(`  Plans:           ${process.env.CONTRACT_ID}`);
+console.log(
+  `  Target Savings:  ${targetSavingsId ?? "(not configured — target_periodic disabled)"}`,
+);
+console.log(`  Network:         ${process.env.STELLAR_NETWORK || "testnet"}\n`);
 
-if (!cron.validate(cronSchedule)) {
-  console.error('❌ Invalid cron schedule');
-  process.exit(1);
-}
+// ── Schedules (env-overridable) ───────────────────────────────────
+const schedules = {
+  billPayments: process.env.CRON_BILL_PAYMENTS || "0 12 * * *",
+  targetPeriodic: process.env.CRON_TARGET_PERIODIC || "0 0 * * *",
+  blendIdleSweep: process.env.CRON_BLEND_SWEEP || "0 */6 * * *",
+};
 
-const runNow = process.argv.includes('--now');
+// ── Run ───────────────────────────────────────────────────────────
+const cfg = {
+  loktinContract,
+  // If target savings isn't configured, the scheduler will still run other jobs.
+  // For safety, we cast — the target_periodic job will simply error out if called
+  // without a configured contract.
+  targetSavingsContract: targetSavingsContract!,
+  adminKeypair,
+  schedules,
+};
 
-if (runNow) {
-  console.log('🚀 Running manual payment check...\n');
-  processDueBills(contract, adminKeypair)
-    .then((result) => {
-      console.log('✅ Manual run completed');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('❌ Manual run failed:', error);
+if (process.argv.includes("--now")) {
+  runAllOnce(cfg)
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error("❌ Run failed:", err);
       process.exit(1);
     });
 } else {
-  console.log('⏰ Keeper service started. Waiting for scheduled runs...\n');
-  console.log('Press Ctrl+C to stop\n');
-
-  cron.schedule(cronSchedule, async () => {
-    try {
-      await processDueBills(contract, adminKeypair);
-    } catch (error) {
-      console.error('❌ Error in scheduled job:', error);
-    }
-  });
+  startScheduler(cfg);
 }
-
-process.on('SIGINT', () => {
-  console.log('\n\n👋 Keeper service stopped');
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  console.log('\n\n👋 Keeper service stopped');
-  process.exit(0);
-});

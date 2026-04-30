@@ -1,7 +1,7 @@
 {
-  "name": "lockedin-keeper",
+  "name": "loktin-keeper",
   "version": "1.0.0",
-  "description": "Automated bill payment keeper service for LockedIn",
+  "description": "Automated bill payment keeper service for Loktin",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -11,7 +11,10 @@
   "dependencies": {
     "@stellar/stellar-sdk": "^14.3.1",
     "dotenv": "^17.2.3",
-    "lockedin": "file:../",
+    "lockedin": "file:../packages/lockedin",
+    "target_savings": "file:../packages/target_savings",
+    "locked_vault": "file:../packages/locked_vault",
+    "spend_save": "file:../packages/spend_save",
     "node-cron": "^4.2.1"
   },
   "devDependencies": {
