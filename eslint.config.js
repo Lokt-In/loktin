@@ -12,6 +12,7 @@ export default tseslint.config(
   globalIgnores([
     "dist",
     "packages",
+    "docs",
     "src/contracts/*",
     "!src/contracts/util.ts",
   ]),
