@@ -1,79 +1,111 @@
 import { useState } from "react";
-import { Button, Text, Modal, Profile } from "@stellar/design-system";
 import { useWallet } from "../hooks/useWallet";
 import { useWalletBalance } from "../hooks/useWalletBalance";
 import { connectWallet, disconnectWallet } from "../util/wallet";
+import Button from "../shared/components/Button";
+import Modal from "../shared/components/Modal";
 
 export const WalletButton = () => {
-  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [showDisconnect, setShowDisconnect] = useState(false);
   const { address, isPending } = useWallet();
-  const { xlm, ...balance } = useWalletBalance();
-  const buttonLabel = isPending ? "Loading..." : "Connect";
+  const { xlm, isLoading } = useWalletBalance();
+
+  const shortAddr = address
+    ? `${address.slice(0, 6)}…${address.slice(-4)}`
+    : "";
 
   if (!address) {
     return (
-      <Button variant="primary" size="md" onClick={() => void connectWallet()}>
-        {buttonLabel}
+      <Button
+        variant="primary"
+        size="md"
+        onClick={() => void connectWallet()}
+        isLoading={isPending}
+      >
+        {isPending ? "Connecting…" : "Connect Wallet"}
       </Button>
     );
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: "5px",
-        opacity: balance.isLoading ? 0.6 : 1,
-      }}
-    >
-      <Text as="div" size="sm">
-        Wallet Balance: {xlm} XLM
-      </Text>
-
-      <div id="modalContainer">
-        <Modal
-          visible={showDisconnectModal}
-          onClose={() => setShowDisconnectModal(false)}
-          parentId="modalContainer"
+    <>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}
+      >
+        <span
+          style={{
+            fontSize: "var(--font-size-xs)",
+            color: "var(--fg-muted)",
+            opacity: isLoading ? 0.6 : 1,
+          }}
         >
-          <Modal.Heading>
-            Connected as{" "}
-            <code style={{ lineBreak: "anywhere" }}>{address}</code>. Do you
-            want to disconnect?
-          </Modal.Heading>
-          <Modal.Footer itemAlignment="stack">
-            <Button
-              size="md"
-              variant="primary"
-              onClick={() => {
-                void disconnectWallet().then(() =>
-                  setShowDisconnectModal(false),
-                );
-              }}
-            >
-              Disconnect
-            </Button>
-            <Button
-              size="md"
-              variant="tertiary"
-              onClick={() => {
-                setShowDisconnectModal(false);
-              }}
-            >
-              Cancel
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          {xlm ? `${xlm} XLM` : "—"}
+        </span>
+        <button
+          onClick={() => setShowDisconnect(true)}
+          style={{
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            color: "var(--fg-primary)",
+            fontFamily: "var(--font-mono)",
+            fontSize: "var(--font-size-xs)",
+            padding: "var(--sp-2) var(--sp-3)",
+            cursor: "pointer",
+            letterSpacing: "0.04em",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--sp-2)",
+          }}
+        >
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "var(--status-success)",
+              display: "inline-block",
+            }}
+          />
+          {shortAddr}
+        </button>
       </div>
 
-      <Profile
-        publicAddress={address}
-        size="md"
-        isShort
-        onClick={() => setShowDisconnectModal(true)}
-      />
-    </div>
+      <Modal
+        isOpen={showDisconnect}
+        onClose={() => setShowDisconnect(false)}
+        title="Wallet Connected"
+      >
+        <p
+          style={{
+            fontSize: "var(--font-size-sm)",
+            color: "var(--fg-secondary)",
+            marginBottom: "var(--sp-4)",
+            wordBreak: "break-all",
+          }}
+        >
+          {address}
+        </p>
+        <div style={{ display: "flex", gap: "var(--sp-3)" }}>
+          <Button
+            variant="danger"
+            size="md"
+            onClick={() =>
+              void disconnectWallet().then(() => setShowDisconnect(false))
+            }
+          >
+            Disconnect
+          </Button>
+          <Button
+            variant="ghost"
+            size="md"
+            onClick={() => setShowDisconnect(false)}
+          >
+            Cancel
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 };
+
+export default WalletButton;

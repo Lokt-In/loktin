@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import * as LockedInContract from "lockedin";
 import { rpcUrl } from "../../../contracts/util";
-import { buildClient } from "../../../contracts/clientHelpers";
+import { buildClient, sendWithAuth } from "../../../contracts/clientHelpers";
 import { useWallet } from "../../../hooks/useWallet";
 
 type WalletMethods = {
@@ -90,7 +90,7 @@ export function useCycles() {
           duration_months: durationMonths,
           amount,
         });
-        const sent = await tx.signAndSend();
+        const sent = await sendWithAuth(tx, address, signAuthEntry);
         const result = (sent as { result?: unknown }).result;
         const id = typeof result === "bigint" ? result : extractValue(result);
         await loadCycles();
