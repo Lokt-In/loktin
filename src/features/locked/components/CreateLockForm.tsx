@@ -3,7 +3,7 @@ import Button from "../../../shared/components/Button";
 import Input from "../../../shared/components/Input";
 
 interface Props {
-  onLock: (amount: bigint, durationMonths: number) => Promise<void>;
+  onLock: (amount: bigint, durationMonths: number) => void | Promise<void>;
   loading: boolean;
   apyTiers: Map<number, number>; // duration_months -> apy_bps
 }

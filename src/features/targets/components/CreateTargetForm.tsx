@@ -15,7 +15,7 @@ interface Props {
     periodSeconds: bigint,
     periodAmount: bigint,
     endDate: bigint,
-  ) => Promise<void>;
+  ) => void | Promise<void>;
   loading: boolean;
 }
 
