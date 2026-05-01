@@ -250,7 +250,7 @@ export default function Analytics() {
           Loading data…
         </div>
       ) : !stats ? (
-        <p style={{ color: "var(--fg-muted)" }}>Failed to load data.</p>
+        <p style={{ color: "var(--fg-muted)" }}>No data available.</p>
       ) : (
         <div
           style={{

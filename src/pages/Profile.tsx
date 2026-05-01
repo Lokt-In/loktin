@@ -67,7 +67,8 @@ export default function Profile() {
   };
 
   const supbaseConfigured = !!(
-    import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
+    import.meta.env.PUBLIC_SUPABASE_URL &&
+    import.meta.env.PUBLIC_SUPABASE_ANON_KEY
   );
 
   return (
@@ -95,8 +96,8 @@ export default function Profile() {
             color: "var(--status-warning)",
           }}
         >
-          ⚠ Supabase not configured — set VITE_SUPABASE_URL and
-          VITE_SUPABASE_ANON_KEY in .env to enable profile persistence.
+          ⚠ Supabase not configured — set PUBLIC_SUPABASE_URL and
+          PUBLIC_SUPABASE_ANON_KEY in .env to enable profile persistence.
         </div>
       )}
 

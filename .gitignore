@@ -35,10 +35,9 @@ lerna-debug.log*
 # macOS-specific files
 .DS_Store
 
-# generated contract clients
-packages/*
-# if you have other workspace packages, add them here
-!packages/.gitkeep
+# generated contract clients — ignore build output and deps, but keep source
+packages/*/node_modules
+packages/*/dist
 
 # generated contract client imports
 src/contracts/*

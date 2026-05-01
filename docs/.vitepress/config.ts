@@ -39,7 +39,7 @@ export default defineConfig({
         text: "Savings Primitives",
         collapsed: false,
         items: [
-          { text: "Bill Plans)", link: "/primitives/plans" },
+          { text: "Bill Plans", link: "/primitives/plans" },
           { text: "Target Savings", link: "/primitives/target-savings" },
           { text: "Locked In", link: "/primitives/locked-in" },
           { text: "Spend & Save", link: "/primitives/spend-save" },
@@ -68,7 +68,6 @@ export default defineConfig({
         text: "How To",
         collapsed: true,
         items: [
-          { text: "Connect Your Wallet", link: "/how-to/connect-wallet" },
           { text: "Create a Plan", link: "/how-to/create-plan" },
           { text: "Set Up Target Savings", link: "/how-to/target-savings" },
           { text: "Lock In USDC", link: "/how-to/lock-in" },

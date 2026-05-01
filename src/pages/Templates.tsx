@@ -163,7 +163,8 @@ export default function Templates() {
   const [tab, setTab] = useState<"mine" | "community">("community");
 
   const supabaseConfigured = !!(
-    import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
+    import.meta.env.PUBLIC_SUPABASE_URL &&
+    import.meta.env.PUBLIC_SUPABASE_ANON_KEY
   );
 
   useEffect(() => {
@@ -261,8 +262,8 @@ export default function Templates() {
             color: "var(--status-warning)",
           }}
         >
-          ⚠ Supabase not configured — configure VITE_SUPABASE_URL and
-          VITE_SUPABASE_ANON_KEY to save and load custom templates.
+          ⚠ Supabase not configured — configure PUBLIC_SUPABASE_URL and
+          PUBLIC_SUPABASE_ANON_KEY to save and load custom templates.
         </div>
       )}
 

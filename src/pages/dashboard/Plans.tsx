@@ -56,8 +56,7 @@ export default function Plans() {
               color: "var(--fg-muted)",
             }}
           >
-            {cycleIds.length} active plan{cycleIds.length !== 1 ? "s" : ""} ·
-            time-locked bill payment cycles
+            {cycleIds.length} active plan{cycleIds.length !== 1 ? "s" : ""}
           </p>
         </div>
         <Button
