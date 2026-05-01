@@ -29,4 +29,3 @@ You don't have to use all four. Most users start with one and add others as thei
 
 - Set up your wallet and connect: [Getting Started →](/getting-started)
 - Browse the savings options: [Plans](/primitives/plans), [Target Savings](/primitives/target-savings), [Locked In](/primitives/locked-in), [Spend & Save](/primitives/spend-save)
-- Look under the hood: [Architecture →](/architecture/overview)

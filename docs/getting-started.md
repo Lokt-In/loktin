@@ -33,6 +33,5 @@ This is a wallet-side limitation, not a Loktin issue. It also won't apply once m
 
 ## Need help?
 
-- [How to connect your wallet](/how-to/connect-wallet)
 - [FAQ](/reference/faq)
 - [Open an issue on GitHub](https://github.com/Mackenzie-OO7/lockedin/issues)

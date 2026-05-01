@@ -28,7 +28,7 @@ A Target Savings position. Has a name, target amount, end date, deposit cadence,
 
 ## Keeper
 
-A cron service that runs admin jobs, from paying bills to processing periodic deposits. See [Keeper Service](/architecture/keeper-service).
+A cron service that runs admin jobs, from paying bills to processing periodic deposits.
 
 ## Lock
 
