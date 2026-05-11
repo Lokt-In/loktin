@@ -91,7 +91,7 @@ export default defineConfig({
     ],
 
     footer: {
-      message: "Built on Stellar · Powered by Soroban Smart Contracts",
+      message: "Built on Stellar",
       copyright: "© 2026 Loktin",
     },
 

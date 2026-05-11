@@ -4,7 +4,23 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* Sharp-edge enforcement: preserve the brutalist look on form controls and the
+   dashboard. Landing-page organic shapes (bubbles, clouds, pebbles) are SVG-
+   based and unaffected. The `.organic` class is an explicit escape hatch for
+   any future rounded-div use on the landing. */
+input,
+select,
+textarea,
+button,
+.sharp-edge,
+.sharp-edge * {
   border-radius: 0 !important;
+}
+.organic,
+.organic *:not(input):not(select):not(textarea):not(button) {
+  border-radius: revert !important;
 }
 
 html,

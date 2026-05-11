@@ -1,5 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
+import { useRef } from "react";
 import { connectWallet } from "../util/wallet";
 import { useWallet } from "../hooks/useWallet";
 
@@ -9,6 +11,212 @@ const DOT: React.CSSProperties = {
     "radial-gradient(circle, rgba(240,244,248,0.07) 1px, transparent 1px)",
   backgroundSize: "28px 28px",
 };
+
+// ── Reusable scroll-reveal wrapper ─────────────────────────────────────
+function Reveal({
+  children,
+  delay = 0,
+  y = 60,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  y?: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-80px" }}
+      transition={{ type: "spring", stiffness: 65, damping: 20, delay }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// ── Hero photo, behind the bars, anchored bottom-right ─────────────────
+function HeroPhoto() {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        right: 0,
+        bottom: 0,
+        width: "min(52%, 640px)",
+        height: "78%",
+        zIndex: 1,
+        pointerEvents: "none",
+        overflow: "hidden",
+        maskImage:
+          "linear-gradient(to left, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%), linear-gradient(to top, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)",
+        WebkitMaskComposite: "source-in",
+        maskComposite: "intersect",
+      }}
+    >
+      <img
+        src="/landing/hero.jpg"
+        alt=""
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: "center",
+          opacity: 0.7,
+          mixBlendMode: "luminosity",
+          filter: "contrast(1.1) brightness(0.85)",
+        }}
+      />
+    </div>
+  );
+}
+
+// ── Organic shape components ───────────────────────────────────────────
+// All three use the "back-layer" technique: same path rendered twice, once
+// offset down-right in a darker fill (the "shadow side"), then on top in the
+// surface color with a thick stroke. Produces sticker-like flat shading with
+// no CSS box-shadow.
+
+const SHAPE_STROKE = "rgba(240,244,248,0.55)";
+const SHAPE_FILL = "#1a3033"; // slightly elevated from --bg-base
+const SHAPE_SHADOW = "#0a1818"; // back-layer "shadow side"
+
+type ShapeProps = {
+  children?: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+};
+
+/** Small horizontal blob. Used to house step numbers in How It Works. */
+function Pebble({ children, className, style }: ShapeProps) {
+  const d =
+    "M 18 28 C 18 10, 40 4, 75 6 C 115 8, 138 14, 142 28 C 144 40, 122 48, 78 48 C 35 48, 16 42, 18 28 Z";
+  return (
+    <div
+      className={`organic ${className ?? ""}`}
+      style={{ position: "relative", display: "inline-block", ...style }}
+    >
+      <svg
+        viewBox="0 0 160 56"
+        preserveAspectRatio="none"
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          display: "block",
+        }}
+      >
+        <path d={d} fill={SHAPE_SHADOW} transform="translate(4, 4)" />
+        <path d={d} fill={SHAPE_FILL} stroke={SHAPE_STROKE} strokeWidth="2.5" />
+      </svg>
+      <div
+        style={{
+          position: "relative",
+          padding: "var(--sp-2) var(--sp-5)",
+          zIndex: 1,
+          textAlign: "center",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── Step row with pebbles connected by an animated rope ────────────────
+function StepRow() {
+  const ref = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "relative",
+        display: "grid",
+        gridTemplateColumns: `repeat(${STEPS.length}, 1fr)`,
+        gap: "var(--sp-6)",
+        padding: "var(--sp-6) 0",
+      }}
+    >
+      {/* Connecting rope behind the pebbles */}
+      <svg
+        viewBox="0 0 1000 220"
+        preserveAspectRatio="none"
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
+      >
+        <motion.path
+          d="M 60 60 Q 220 100, 360 60 T 660 60 T 940 60"
+          fill="none"
+          stroke="rgba(240,244,248,0.35)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray="6 8"
+          initial={{ pathLength: 0, opacity: 0 }}
+          whileInView={{ pathLength: 1, opacity: 1 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{
+            duration: reduce ? 0 : 1.6,
+            ease: "easeOut",
+          }}
+        />
+      </svg>
+
+      {STEPS.map((step, i) => (
+        <motion.div
+          key={step.n}
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{
+            type: "spring",
+            stiffness: 70,
+            damping: 16,
+            delay: 0.15 + i * 0.12,
+          }}
+          style={{
+            position: "relative",
+            zIndex: 1,
+            textAlign: "center",
+            padding: "0 var(--sp-3)",
+          }}
+        >
+          <Pebble style={{ minWidth: 140, marginBottom: "var(--sp-5)" }}>
+            <span
+              style={{
+                fontSize: "var(--font-size-sm)",
+                fontWeight: 700,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                color: "var(--fg-primary)",
+              }}
+            >
+              {step.n}
+            </span>
+          </Pebble>
+          <p
+            style={{
+              fontSize: "var(--font-size-sm)",
+              color: "var(--fg-secondary)",
+              lineHeight: 1.6,
+              maxWidth: 220,
+              margin: "0 auto",
+            }}
+          >
+            {step.body}
+          </p>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
 
 // ── Feature cards data ─────────────────────────────────────────────
 const FEATURES = [
@@ -142,9 +350,10 @@ export default function Landing() {
           paddingTop: "var(--nav-height)",
         }}
       >
-        {/* (Bag images removed — to be added back later) */}
+        {/* Hero photograph — behind the bars, anchored bottom-right */}
+        <HeroPhoto />
 
-        {/* Jail bars */}
+        {/* Jail bars — original straight vertical bars */}
         <div
           style={{
             position: "absolute",
@@ -189,7 +398,7 @@ export default function Landing() {
               right: 0,
               height: 6,
               background:
-                "linear-gradient(to top, rgba(24,244,248,0.18), rgba(240,244,248,0.06))",
+                "linear-gradient(to top, rgba(240,244,248,0.18), rgba(240,244,248,0.06))",
               boxShadow: "0 -3px 8px rgba(0,0,0,0.5)",
             }}
           />
@@ -214,7 +423,18 @@ export default function Landing() {
               <br />
               Lock In.
               <br />
-              <span style={{ color: "var(--accent-primary)" }}>Earn.</span>
+              <span style={{ color: "var(--accent-primary)" }}>
+                Earn Yield
+                {/* <span
+                  style={{
+                    opacity: 0.5,
+                    filter: "saturate(0.6) brightness(0.85)",
+                    marginLeft: 2,
+                  }}
+                >
+                  🌻
+                </span> */}
+              </span>
             </h1>
             <p
               style={{
@@ -290,80 +510,57 @@ export default function Landing() {
       <section
         id="how-it-works"
         style={{
-          padding: "var(--sp-24) 0",
+          padding: "var(--sp-16) 0",
           borderBottom: "1px solid var(--border)",
           background: "var(--bg-elevated)",
           ...DOT,
         }}
       >
         <div className="container">
-          <h2
-            style={{
-              fontSize: "var(--font-size-3xl)",
-              fontWeight: 700,
-              marginBottom: "var(--sp-16)",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            The financial discipline you've been meaning to have.
-          </h2>
-          <p
-            style={{
-              fontSize: "var(--font-size-md)",
-              color: "var(--fg-secondary)",
-              maxWidth: 640,
-              marginTop: "calc(-1 * var(--sp-12))",
-              marginBottom: "var(--sp-16)",
-              lineHeight: 1.7,
-            }}
-          >
-            {/* Bills get paid before they're due,
-            savings hit their goals on schedule, and money you've set aside is
-            quietly earning the whole time. */}
-          </p>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 0,
-              border: "1px solid var(--border)",
-            }}
-          >
-            {STEPS.map((step, i) => (
-              <div
-                key={step.n}
-                className="lkt-step-card"
-                style={{
-                  padding: "var(--sp-8) var(--sp-6)",
-                  borderRight:
-                    i < STEPS.length - 1 ? "1px solid var(--border)" : "none",
-                  background: i % 2 === 1 ? "var(--bg-surface)" : "transparent",
-                }}
-              >
-                <div
-                  className="lkt-step-n"
+          <Reveal>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(260px, 1fr) 1.6fr",
+                gap: "var(--sp-12)",
+                alignItems: "center",
+                marginBottom: "var(--sp-12)",
+              }}
+            >
+              {/* <SoftPhoto src="/landing/making-plans.jpg" alt="" /> */}
+              <div>
+                <h2
                   style={{
-                    fontSize: "var(--font-size-4xl)",
+                    // fontFamily: "'Diplomata SC', Georgia, serif",
+                    fontSize: "var(--font-size-3xl)",
                     fontWeight: 700,
-                    color: "var(--border)",
+                    letterSpacing: "-0.01em",
                     marginBottom: "var(--sp-4)",
-                    lineHeight: 1,
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  {step.n}
-                </div>
+                  The financial discipline you've been meaning to have.
+                </h2>
                 <p
                   style={{
-                    fontSize: "var(--font-size-sm)",
+                    fontSize: "var(--font-size-md)",
                     color: "var(--fg-secondary)",
-                    lineHeight: 1.6,
+                    lineHeight: 1.7,
+                    maxWidth: 560,
                   }}
                 >
-                  {step.body}
+                  {/* Decide once and live your life. Bills get paid before they're
+                  due, savings hit their goals on schedule, and money you've
+                  set aside is quietly earning the whole time. */}
                 </p>
               </div>
-            ))}
-          </div>
+            </div>
+          </Reveal>
+
+          {/* Step row with connecting rope */}
+          <Reveal y={40}>
+            <StepRow />
+          </Reveal>
         </div>
       </section>
 
@@ -382,33 +579,48 @@ export default function Landing() {
           }}
         >
           <div className="container">
-            <h2
-              style={{
-                fontSize: "var(--font-size-3xl)",
-                fontWeight: 700,
-                marginBottom: "var(--sp-16)",
-                letterSpacing: "-0.01em",
+            <Reveal>
+              <h2
+                style={{
+                  fontSize: "var(--font-size-3xl)",
+                  fontWeight: 700,
+                  marginBottom: "var(--sp-16)",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                Four ways to commit
+              </h2>
+            </Reveal>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-60px" }}
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: 0.1 } },
               }}
-            >
-              Four ways to commit
-            </h2>
-            <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: 0,
-                border: "1px solid var(--border)",
+                gap: "var(--sp-6)",
+                alignItems: "stretch",
               }}
             >
-              {FEATURES.map((f, i) => (
-                <div
+              {FEATURES.map((f) => (
+                <motion.div
                   key={f.title}
                   className="lkt-feature-card"
+                  variants={{
+                    hidden: { opacity: 0, y: 30 },
+                    visible: { opacity: 1, y: 0 },
+                  }}
+                  transition={{ type: "spring", stiffness: 75, damping: 18 }}
                   style={{
                     padding: "var(--sp-8) var(--sp-6)",
-                    borderRight:
-                      (i + 1) % 2 !== 0 ? "1px solid var(--border)" : "none",
-                    borderBottom: i < 2 ? "1px solid var(--border)" : "none",
+                    border: "1px solid var(--border)",
+                    background: "rgba(240, 244, 248, 0.015)",
+                    display: "flex",
+                    flexDirection: "column",
                   }}
                 >
                   <span
@@ -442,9 +654,9 @@ export default function Landing() {
                   >
                     {f.body}
                   </p>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </div>
 
@@ -662,10 +874,51 @@ export default function Landing() {
       </section>
 
       {/* ── FINAL CTA ── */}
-      <section style={{ padding: "var(--sp-20) 0" }}>
+      <section
+        style={{
+          padding: "var(--sp-20) 0",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* Background photo — heavily blended into the section bg */}
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 0,
+            pointerEvents: "none",
+            maskImage:
+              "radial-gradient(ellipse at center, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)",
+            WebkitMaskImage:
+              "radial-gradient(ellipse at center, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 85%)",
+          }}
+        >
+          <img
+            src="/landing/financial-freedom.jpg"
+            alt=""
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center",
+              opacity: 0.55,
+              mixBlendMode: "luminosity",
+              filter: "contrast(1.05) brightness(0.7)",
+            }}
+          />
+        </div>
+
         <div
           className="container"
-          style={{ textAlign: "center", maxWidth: 800, margin: "0 auto" }}
+          style={{
+            textAlign: "center",
+            maxWidth: 800,
+            margin: "0 auto",
+            position: "relative",
+            zIndex: 1,
+          }}
         >
           <h2
             style={{
@@ -737,12 +990,12 @@ export default function Landing() {
           <span>© 2026 Loktin</span>
           <a
             className="lkt-link-arrow"
-            href={`https://stellar.expert/explorer/testnet/contract/CBCKKGNNNFSMTE2IPVGA5YUHSTIN4XX5MQ7LZN4MCPHAKATHWZODGXJN`}
+            href="https://docs.loktin.xyz"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: "var(--fg-primary)", textDecoration: "none" }}
           >
-            View Contract <span className="lkt-arrow">↗</span>
+            Documentation <span className="lkt-arrow">↗</span>
           </a>
         </div>
       </footer>
