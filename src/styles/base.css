@@ -79,3 +79,253 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   HOVER SYSTEM — architectural, geometric, no glow
+   - lifts (translateY)
+   - line growths (top/bottom accent strokes via ::before)
+   - arrow nudges
+   - letter-spacing tightening / widening
+   - subtle bg + border-edge brightening
+   ───────────────────────────────────────────────────────────────────── */
+
+/* All inline arrows ride this class for the nudge */
+.lkt-arrow {
+  display: inline-block;
+  transition: transform 220ms cubic-bezier(0.2, 0.85, 0.2, 1);
+  will-change: transform;
+}
+
+/* ─── Wordmark — letter-spacing flex + color brighten ─── */
+.lkt-wordmark {
+  cursor: pointer;
+  transition:
+    letter-spacing 280ms cubic-bezier(0.2, 0.85, 0.2, 1),
+    color 200ms ease;
+}
+.lkt-wordmark:hover {
+  letter-spacing: 0.22em !important;
+  color: #ffffff;
+}
+
+/* ─── Primary button (filled, accent bg) ─── */
+.lkt-btn-primary {
+  position: relative;
+  isolation: isolate;
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.85, 0.2, 1),
+    background-color 200ms ease,
+    box-shadow 240ms ease;
+  cursor: pointer;
+}
+.lkt-btn-primary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+.lkt-btn-primary:hover {
+  background-color: var(--accent-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 0 -6px rgba(101, 96, 160, 0.35);
+}
+.lkt-btn-primary:hover::before {
+  opacity: 1;
+}
+.lkt-btn-primary:hover .lkt-arrow {
+  transform: translateX(4px);
+}
+.lkt-btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 0 -1px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Ghost / outline button ─── */
+.lkt-btn-ghost {
+  position: relative;
+  transition:
+    border-color 200ms ease,
+    background-color 240ms ease,
+    color 200ms ease;
+  cursor: pointer;
+}
+.lkt-btn-ghost:hover {
+  border-color: var(--fg-primary) !important;
+  background-color: rgba(240, 244, 248, 0.04) !important;
+}
+.lkt-btn-ghost:hover .lkt-arrow {
+  transform: translateY(3px);
+}
+
+/* Variant: ghost with a horizontal-arrow nudge */
+.lkt-btn-ghost.lkt-arrow-right:hover .lkt-arrow {
+  transform: translateX(4px);
+}
+
+/* ─── Feature card — top-edge line growth + bg lift + icon kinetics ─── */
+.lkt-feature-card {
+  position: relative;
+  transition:
+    background-color 280ms ease,
+    transform 280ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+.lkt-feature-card::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--accent-hover);
+  transition: width 360ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+.lkt-feature-card::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  right: 0;
+  width: 0;
+  height: 2px;
+  background: var(--accent-hover);
+  transition: width 360ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+.lkt-feature-card:hover {
+  background-color: rgba(240, 244, 248, 0.025);
+}
+.lkt-feature-card:hover::before,
+.lkt-feature-card:hover::after {
+  width: 100%;
+}
+.lkt-feature-card .lkt-icon {
+  display: inline-block;
+  transition: transform 360ms cubic-bezier(0.2, 0.85, 0.2, 1);
+  transform-origin: center;
+}
+.lkt-feature-card:hover .lkt-icon {
+  transform: scale(1.15) rotate(-4deg);
+}
+
+/* ─── Step card — left edge marker + n-label shift ─── */
+.lkt-step-card {
+  position: relative;
+  transition: background-color 240ms ease;
+}
+.lkt-step-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  background: var(--accent-hover);
+  transform: translateY(-50%);
+  transition: height 320ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+.lkt-step-card:hover {
+  background-color: rgba(240, 244, 248, 0.025);
+}
+.lkt-step-card:hover::before {
+  height: 60%;
+}
+.lkt-step-card .lkt-step-n {
+  transition:
+    color 280ms ease,
+    transform 280ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+.lkt-step-card:hover .lkt-step-n {
+  color: var(--fg-primary);
+  transform: translateX(6px);
+}
+
+/* ─── Coming-Soon panels (Blend / Privacy) ─── */
+.lkt-soon-panel {
+  position: relative;
+  transition: background-color 240ms ease;
+}
+.lkt-soon-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  transition: border-color 240ms ease;
+  pointer-events: none;
+}
+.lkt-soon-panel:hover {
+  background-color: rgba(240, 244, 248, 0.02);
+}
+.lkt-soon-panel:hover::after {
+  border-color: var(--border-hover);
+}
+
+/* ─── Footer "View Contract" link — underline grows in ─── */
+.lkt-link-arrow {
+  position: relative;
+  display: inline-block;
+  transition: color 200ms ease;
+}
+.lkt-link-arrow::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  width: 0;
+  height: 1px;
+  background: currentColor;
+  transition: width 280ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+.lkt-link-arrow:hover::after {
+  width: 100%;
+}
+.lkt-link-arrow:hover .lkt-arrow {
+  transform: translate(3px, -2px);
+}
+
+/* ─── Big final CTA — slightly heavier press ─── */
+.lkt-btn-mega {
+  position: relative;
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.85, 0.2, 1),
+    background-color 220ms ease,
+    box-shadow 280ms ease,
+    letter-spacing 280ms cubic-bezier(0.2, 0.85, 0.2, 1);
+  cursor: pointer;
+}
+.lkt-btn-mega:hover {
+  background-color: var(--accent-hover) !important;
+  transform: translateY(-3px);
+  letter-spacing: 0.12em !important;
+  box-shadow: 0 14px 0 -8px rgba(101, 96, 160, 0.4);
+}
+.lkt-btn-mega:hover .lkt-arrow {
+  transform: translateX(6px);
+}
+.lkt-btn-mega:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 0 -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .lkt-arrow,
+  .lkt-wordmark,
+  .lkt-btn-primary,
+  .lkt-btn-ghost,
+  .lkt-feature-card,
+  .lkt-feature-card::before,
+  .lkt-feature-card::after,
+  .lkt-feature-card .lkt-icon,
+  .lkt-step-card,
+  .lkt-step-card::before,
+  .lkt-step-card .lkt-step-n,
+  .lkt-soon-panel,
+  .lkt-soon-panel::after,
+  .lkt-link-arrow,
+  .lkt-link-arrow::after,
+  .lkt-btn-mega {
+    transition: none !important;
+  }
+}

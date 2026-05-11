@@ -1,12 +1,12 @@
-# LockedIn 🔒
+# Loktin
 
-**Get LockedIn to Financial Discipline** - A platform for automated bill payment management with time-locked funds.
- 
+A platform for automated bill payment management with time-locked funds.
+
 Built with [Scaffold Stellar](https://github.com/AhaLabs/scaffold-stellar).
 
 ## Overview
 
-LockedIn helps users maintain financial discipline by locking funds in time-based cycles and automatically paying bills on their due dates. Users deposit USDC into billing cycles, add their recurring or one-time bills, and let the keeper service handle payments automatically preventing missed payments and overdrafts.
+Loktin helps users maintain financial discipline by locking funds in time-based cycles and automatically paying bills on their due dates. Users deposit USDC into billing cycles, add their recurring or one-time bills, and let the keeper service handle payments automatically preventing missed payments and overdrafts.
 
 ### Key Features
 
@@ -21,10 +21,6 @@ LockedIn helps users maintain financial discipline by locking funds in time-base
 - **Over-Allocation Protection** - Ensures bills don't exceed available funds
 
 - **Batch Operations** - Add or cancel multiple bills in a single transaction
-
-- **Two-Step Admin Transfer** - Secure admin role management
-
-- **Security First** - CEI pattern, reentrancy guards, double-payment prevention
 
 ## Architecture
 
@@ -86,7 +82,7 @@ LockedIn helps users maintain financial discipline by locking funds in time-base
 
 ### Prerequisites
 
-- [Rust](https://www.rust-lang.org/tools/install) 
+- [Rust](https://www.rust-lang.org/tools/install)
 - [Node.js](https://nodejs.org/) (v22 or higher)
 - [Stellar CLI](https://github.com/stellar/stellar-cli)
 - [Scaffold Stellar CLI](https://github.com/AhaLabs/scaffold-stellar)
@@ -144,18 +140,6 @@ npm run dev
 
 - **Recurrence Calendar** - Precise control over which months bills recur
 
-### Security Features
-
-- **Reentrancy Protection** - Global lock prevents concurrent execution
-
-- **CEI Pattern** - Checks-Effects-Interactions pattern in all payment functions
-
-- **Double-Payment Prevention** - Last paid date tracking for recurring bills
-
-- **Over-Allocation Validation** - Prevents bills from exceeding available funds
-
-- **Monthly Adjustment Limit** - One bill modification per cycle per month
-
 ### Payment Processing
 
 - **User Payment** - Pay bills that are due (enforces due date)
@@ -168,7 +152,7 @@ npm run dev
 
 The keeper service automates bill payments by running scheduled checks for due bills.
 
-### Setup Keeper 
+### Setup Keeper
 
 ```bash
 
@@ -258,17 +242,3 @@ cd contracts/lockedin
 cargo test
 
 ```
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Acknowledgments
-
-- Built with [Scaffold Stellar](https://github.com/AhaLabs/scaffold-stellar)
-
-- Security patterns inspired by [OpenZeppelin](https://www.openzeppelin.com/)
-
----
-
-**Built with ❤️ on Stellar**

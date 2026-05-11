@@ -16,7 +16,7 @@ import Input from "../shared/components/Input";
 import Badge from "../shared/components/Badge";
 
 export default function Profile() {
-  const { address, network, networkPassphrase } = useWallet();
+  const { address } = useWallet();
   const navigate = useNavigate();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [prefs, setPrefs] = useState<NotificationPrefs>({
@@ -126,13 +126,13 @@ export default function Profile() {
           >
             {[
               { label: "Address", value: address ?? "—", mono: true },
-              { label: "Network", value: network ?? "—" },
-              {
-                label: "Passphrase",
-                value: networkPassphrase ?? "—",
-                mono: true,
-                truncate: true,
-              },
+              // { label: "Network", value: network ?? "—" },
+              // {
+              //   label: "Passphrase",
+              //   value: networkPassphrase ?? "—",
+              //   mono: true,
+              //   truncate: true,
+              // },
             ].map((row) => (
               <div
                 key={row.label}

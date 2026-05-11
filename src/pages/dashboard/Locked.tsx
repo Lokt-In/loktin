@@ -249,9 +249,7 @@ export default function Locked() {
               marginBottom: "var(--sp-4)",
               opacity: 0.3,
             }}
-          >
-            🔒
-          </p>
+          ></p>
           <p
             style={{
               fontSize: "var(--font-size-lg)",

@@ -194,9 +194,7 @@ export default function Plans() {
               marginBottom: "var(--sp-4)",
               opacity: 0.3,
             }}
-          >
-            ⬛
-          </p>
+          ></p>
           <p
             style={{
               fontSize: "var(--font-size-lg)",
@@ -213,7 +211,7 @@ export default function Plans() {
               marginBottom: "var(--sp-6)",
             }}
           >
-            Create your first plan to lock funds and automate bill payments.
+            Create your first plan to lock your funds for bill payments.
           </p>
           <Button
             variant="primary"
