@@ -50,9 +50,9 @@ const variantMap: Record<
     border: "var(--border)",
   },
   accent: {
-    bg: "rgba(89, 65, 87, 0.2)",
-    color: "var(--accent-secondary)",
-    border: "var(--accent-secondary)",
+    bg: "rgba(129, 124, 200, 0.18)",
+    color: "#b8b3e8",
+    border: "#817cc8",
   },
 };
 

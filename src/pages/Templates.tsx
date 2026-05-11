@@ -339,7 +339,7 @@ export default function Templates() {
               marginBottom: "var(--sp-3)",
             }}
           >
-            No templates saved
+            No templates saved yet
           </p>
           <p
             style={{
@@ -348,7 +348,7 @@ export default function Templates() {
               marginBottom: "var(--sp-6)",
             }}
           >
-            Save a plan setup as a template to reuse it later.
+            Save a plan as a template to reuse later.
           </p>
           {supabaseConfigured && (
             <Button
@@ -356,7 +356,7 @@ export default function Templates() {
               size="md"
               onClick={() => setShowSave(true)}
             >
-              Save First Template
+              Save Your First Template
             </Button>
           )}
         </div>
