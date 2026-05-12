@@ -97,6 +97,63 @@ select {
 }
 
 /* ─────────────────────────────────────────────────────────────────────
+   LANDING — mobile responsiveness for the hero photo and the
+   "financial discipline" section. Below the 768px breakpoint:
+   - Hero photo hides entirely (saves space, no clutter)
+   - How-it-works 2-col grid collapses to single column
+   - Heading drops nowrap and shrinks, wraps naturally
+   - Step row breaks to single-column stack and the rope hides
+   ───────────────────────────────────────────────────────────────────── */
+
+.lkt-hero-photo {
+  display: block;
+}
+.lkt-how-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 1.6fr;
+  gap: var(--sp-12);
+  align-items: center;
+  margin-bottom: var(--sp-12);
+}
+.lkt-how-heading {
+  white-space: nowrap;
+  font-size: var(--font-size-3xl);
+}
+.lkt-step-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-6);
+  padding: var(--sp-6) 0;
+  position: relative;
+}
+.lkt-step-rope {
+  display: block;
+}
+
+@media (max-width: 767px) {
+  .lkt-hero-photo {
+    display: none !important;
+  }
+  .lkt-how-grid {
+    grid-template-columns: 1fr;
+    gap: var(--sp-6);
+    margin-bottom: var(--sp-8);
+  }
+  .lkt-how-heading {
+    white-space: normal;
+    font-size: var(--font-size-2xl);
+    line-height: 1.25;
+  }
+  .lkt-step-grid {
+    grid-template-columns: 1fr;
+    gap: var(--sp-8);
+  }
+  .lkt-step-rope {
+    display: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
    HOVER SYSTEM — architectural, geometric, no glow
    - lifts (translateY)
    - line growths (top/bottom accent strokes via ::before)

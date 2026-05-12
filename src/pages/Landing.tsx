@@ -38,6 +38,7 @@ function Reveal({
 function HeroPhoto() {
   return (
     <div
+      className="lkt-hero-photo"
       style={{
         position: "absolute",
         right: 0,
@@ -129,18 +130,10 @@ function StepRow() {
   const reduce = useReducedMotion();
 
   return (
-    <div
-      ref={ref}
-      style={{
-        position: "relative",
-        display: "grid",
-        gridTemplateColumns: `repeat(${STEPS.length}, 1fr)`,
-        gap: "var(--sp-6)",
-        padding: "var(--sp-6) 0",
-      }}
-    >
-      {/* Connecting rope behind the pebbles */}
+    <div ref={ref} className="lkt-step-grid">
+      {/* Connecting rope behind the pebbles — desktop only */}
       <svg
+        className="lkt-step-rope"
         viewBox="0 0 1000 220"
         preserveAspectRatio="none"
         style={{
@@ -467,7 +460,7 @@ export default function Landing() {
                   cursor: "pointer",
                 }}
               >
-                {address ? "Open Dashboard " : "Connect Wallet "}
+                {address ? "Go To Dashboard " : "Connect Wallet "}
                 <span className="lkt-arrow">→</span>
               </button>
               <a
@@ -518,25 +511,15 @@ export default function Landing() {
       >
         <div className="container">
           <Reveal>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(260px, 1fr) 1.6fr",
-                gap: "var(--sp-12)",
-                alignItems: "center",
-                marginBottom: "var(--sp-12)",
-              }}
-            >
+            <div className="lkt-how-grid">
               {/* <SoftPhoto src="/landing/making-plans.jpg" alt="" /> */}
               <div>
                 <h2
+                  className="lkt-how-heading"
                   style={{
-                    // fontFamily: "'Diplomata SC', Georgia, serif",
-                    fontSize: "var(--font-size-3xl)",
                     fontWeight: 700,
                     letterSpacing: "-0.01em",
                     marginBottom: "var(--sp-4)",
-                    whiteSpace: "nowrap",
                   }}
                 >
                   The financial discipline you've been meaning to have.
@@ -956,7 +939,7 @@ export default function Landing() {
               cursor: "pointer",
             }}
           >
-            {address ? "OPEN DASHBOARD " : "GET STARTED "}
+            {address ? "GO TO DASHBOARD " : "GET STARTED "}
             <span className="lkt-arrow">→</span>
           </button>
         </div>
