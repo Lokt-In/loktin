@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import AppLayout from "./shared/layout/AppLayout";
 import DashboardLayout from "./shared/layout/DashboardLayout";
 import Landing from "./pages/Landing";
@@ -13,21 +14,24 @@ import Templates from "./pages/Templates";
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route element={<AppLayout />}>
-        <Route path="/dashboard" element={<DashboardLayout />}>
-          <Route index element={<Overview />} />
-          <Route path="plans" element={<Plans />} />
-          <Route path="targets" element={<Targets />} />
-          <Route path="locked" element={<Locked />} />
-          <Route path="spend-save" element={<SpendSave />} />
+    <>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route element={<AppLayout />}>
+          <Route path="/dashboard" element={<DashboardLayout />}>
+            <Route index element={<Overview />} />
+            <Route path="plans" element={<Plans />} />
+            <Route path="targets" element={<Targets />} />
+            <Route path="locked" element={<Locked />} />
+            <Route path="spend-save" element={<SpendSave />} />
+          </Route>
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/profile" element={<Profile />} />
         </Route>
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/templates" element={<Templates />} />
-        <Route path="/profile" element={<Profile />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <VercelAnalytics />
+    </>
   );
 }
