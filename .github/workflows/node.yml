@@ -43,11 +43,14 @@ jobs:
             echo "stellar-scaffold already installed. Clear cache to force reinstall."
           fi
       - run: npm ci
-      - run: npm run lint
-      - run: npx prettier . --check
       - name: Build clients before building the project
         run: STELLAR_SCAFFOLD_ENV=development stellar-scaffold build --build-clients
       - run: npm run install:contracts
+      # lint + prettier run AFTER the client packages are built: the type-aware
+      # ESLint rules (no-unsafe-*) need the generated package types in
+      # packages/*/dist, which is gitignored and only produced by install:contracts.
+      - run: npm run lint
+      - run: npx prettier . --check
       - run: npm run build
       - name: Run frontend tests
         run: npm test --if-present
