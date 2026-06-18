@@ -12,17 +12,20 @@ Automated bill payment service for LockedIn smart contract.
 ## Setup
 
 1. **Install dependencies**
+
    ```bash
    cd keeper
    npm install
    ```
 
 2. **Configure environment**
+
    ```bash
    cp .env.example .env
    ```
 
 3. **Edit `.env` file** with your admin secret key:
+
    ```env
    ADMIN_SECRET_KEY=YOUR_ADMIN_SECRET_KEY_HERE
    ```
@@ -32,6 +35,7 @@ Automated bill payment service for LockedIn smart contract.
 ## Usage
 
 ### Run the keeper service (scheduled mode)
+
 ```bash
 npm start
 ```
@@ -39,6 +43,7 @@ npm start
 This will start the cron job that runs daily at 12:00 PM UTC.
 
 ### Test manually (run once immediately)
+
 ```bash
 npm start -- --now
 ```
@@ -46,6 +51,7 @@ npm start -- --now
 This will check for due bills and process payments immediately, then exit.
 
 ### Development mode (with auto-reload)
+
 ```bash
 npm run dev
 ```
@@ -74,6 +80,7 @@ The admin secret key has full control over bill payments across all users.
 ## Logs
 
 The keeper service logs:
+
 - Timestamp of each run
 - Number of cycles checked
 - Bills due today
@@ -81,6 +88,7 @@ The keeper service logs:
 - Summary statistics
 
 Example output:
+
 ```
 === Processing Due Bills ===
 Timestamp: 2024-01-15T12:00:00.000Z

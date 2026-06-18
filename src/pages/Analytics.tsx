@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "../hooks/useWallet";
-import * as LockedInContract from "lockedin";
+import * as PlansContract from "plans";
 import { rpcUrl } from "../contracts/util";
 import Card from "../shared/components/Card";
 import Badge from "../shared/components/Badge";
@@ -34,8 +34,8 @@ const MONTHS = [
 const COLORS = ["#514D80", "#594157", "#8DA7BE", "#1C434A", "#263054"];
 
 function makeClient(address: string) {
-  return new LockedInContract.Client({
-    ...LockedInContract.networks.testnet,
+  return new PlansContract.Client({
+    ...PlansContract.networks.testnet,
     rpcUrl,
     publicKey: address,
   });

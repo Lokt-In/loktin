@@ -2,13 +2,13 @@
 
 All Loktin contracts on **Stellar testnet** as of the current deploy.
 
-| Contract             | ID                                                         | Explorer                                                                                                                    |
-| -------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Plans (lockedin)** | `CBCKKGNNNFSMTE2IPVGA5YUHSTIN4XX5MQ7LZN4MCPHAKATHWZODGXJN` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CBCKKGNNNFSMTE2IPVGA5YUHSTIN4XX5MQ7LZN4MCPHAKATHWZODGXJN) |
-| **Target Savings**   | `CAF4L2VNNCUMBGBSHXLHGKLPPKBSF65GGXDQQIBDF4IGJWXPPBOEDBAF` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CAF4L2VNNCUMBGBSHXLHGKLPPKBSF65GGXDQQIBDF4IGJWXPPBOEDBAF) |
-| **Locked Vault**     | `CCXMCHYO2JGPHYSJQ7ZJWAXR2SZKM2RZECOCI7R234FYS3JCGHSD5WSR` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CCXMCHYO2JGPHYSJQ7ZJWAXR2SZKM2RZECOCI7R234FYS3JCGHSD5WSR) |
-| **Spend & Save**     | `CBM3XGPO7LDF56OL7EMRAFFLKLZWHFFZZEBAJGAGMD5KJYXQAALTBQPO` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CBM3XGPO7LDF56OL7EMRAFFLKLZWHFFZZEBAJGAGMD5KJYXQAALTBQPO) |
-| **USDC test token**  | `CCD6TIYLX2PJPFWW2RBNZHAUJPMJVECIPVCILF2NYZWR5GYYDXRM4WHM` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CCD6TIYLX2PJPFWW2RBNZHAUJPMJVECIPVCILF2NYZWR5GYYDXRM4WHM) |
+| Contract            | ID                                                         | Explorer                                                                                                                    |
+| ------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Plans (plans)**   | `CBCKKGNNNFSMTE2IPVGA5YUHSTIN4XX5MQ7LZN4MCPHAKATHWZODGXJN` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CBCKKGNNNFSMTE2IPVGA5YUHSTIN4XX5MQ7LZN4MCPHAKATHWZODGXJN) |
+| **Target Savings**  | `CAF4L2VNNCUMBGBSHXLHGKLPPKBSF65GGXDQQIBDF4IGJWXPPBOEDBAF` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CAF4L2VNNCUMBGBSHXLHGKLPPKBSF65GGXDQQIBDF4IGJWXPPBOEDBAF) |
+| **Locked Vault**    | `CCXMCHYO2JGPHYSJQ7ZJWAXR2SZKM2RZECOCI7R234FYS3JCGHSD5WSR` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CCXMCHYO2JGPHYSJQ7ZJWAXR2SZKM2RZECOCI7R234FYS3JCGHSD5WSR) |
+| **Spend & Save**    | `CBM3XGPO7LDF56OL7EMRAFFLKLZWHFFZZEBAJGAGMD5KJYXQAALTBQPO` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CBM3XGPO7LDF56OL7EMRAFFLKLZWHFFZZEBAJGAGMD5KJYXQAALTBQPO) |
+| **USDC test token** | `CCD6TIYLX2PJPFWW2RBNZHAUJPMJVECIPVCILF2NYZWR5GYYDXRM4WHM` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CCD6TIYLX2PJPFWW2RBNZHAUJPMJVECIPVCILF2NYZWR5GYYDXRM4WHM) |
 
 **Network:** `Test SDF Network ; September 2015`
 **RPC:** `https://soroban-testnet.stellar.org`
@@ -49,13 +49,13 @@ stellar contract invoke \
 
 The repo's `packages/` folder has auto-generated TypeScript bindings for each contract:
 
-- `packages/lockedin`
+- `packages/plans`
 - `packages/target_savings`
-- `packages/locked_vault`
+- `packages/locked_in`
 - `packages/spend_save`
 
 ```typescript
-import * as Plans from "lockedin";
+import * as Plans from "plans";
 
 const client = new Plans.Client({
   ...Plans.networks.testnet,

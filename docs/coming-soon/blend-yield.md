@@ -12,7 +12,7 @@ When Loktin's Blend integration ships, every USDC you commit to a Loktin primiti
 
 ## How it will work (technical)
 
-Every savings contract (`target_savings`, `locked_vault`, `spend_save`, and `lockedin` for plans) ships with a `BlendIntegration` interface:
+Every savings contract (`target_savings`, `locked_in`, `spend_save`, and `plans` for plans) ships with a `BlendIntegration` interface:
 
 ```rust
 fn deposit_to_blend(env: Env, amount: i128) -> Result<(), Error>;

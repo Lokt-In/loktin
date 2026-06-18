@@ -29,14 +29,12 @@ export default function Card({
       }}
       onMouseEnter={(e) => {
         if (hoverable || onClick) {
-          (e.currentTarget as HTMLDivElement).style.borderColor =
-            "var(--border-hover)";
+          e.currentTarget.style.borderColor = "var(--border-hover)";
         }
       }}
       onMouseLeave={(e) => {
         if (hoverable || onClick) {
-          (e.currentTarget as HTMLDivElement).style.borderColor =
-            "var(--border)";
+          e.currentTarget.style.borderColor = "var(--border)";
         }
       }}
     >

@@ -55,10 +55,10 @@ pub enum Error {
 // ── Contract ─────────────────────────────────────────────────────────
 
 #[contract]
-pub struct LockedVault;
+pub struct LockedIn;
 
 #[contractimpl]
-impl LockedVault {
+impl LockedIn {
     pub fn __constructor(env: Env, admin: Address, usdc_token: Address) {
         admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);

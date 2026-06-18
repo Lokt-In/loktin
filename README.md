@@ -14,12 +14,12 @@ Every commitment is enforced by a smart contract. Once funds are committed, they
 
 Loktin ships with four distinct savings options. You don't have to use all four; most users start with one and add others as their needs grow.
 
-| Primitive | What it does | Withdrawal rule |
-| --- | --- | --- |
-| **Plans** | Lock USDC and schedule bill payments. Pays automatically on due dates. | Surplus returns at the end of the plan duration |
-| **Target Savings** | Goal-based vault with periodic auto-deposits. | Locked until the end date |
-| **Locked In** | Fixed-amount, fixed-term lock with tiered APY. | No early withdrawal, it unlocks at maturity |
-| **Spend & Save** | Routes a configured % (1–50%) of every USDC spend into a side vault. | Saved funds withdrawable only on a specific day of the month |
+| Primitive          | What it does                                                           | Withdrawal rule                                              |
+| ------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Plans**          | Lock USDC and schedule bill payments. Pays automatically on due dates. | Surplus returns at the end of the plan duration              |
+| **Target Savings** | Goal-based vault with periodic auto-deposits.                          | Locked until the end date                                    |
+| **Locked In**      | Fixed-amount, fixed-term lock with tiered APY.                         | No early withdrawal, it unlocks at maturity                  |
+| **Spend & Save**   | Routes a configured % (1–50%) of every USDC spend into a side vault.   | Saved funds withdrawable only on a specific day of the month |
 
 ## Features
 

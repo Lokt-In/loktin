@@ -87,7 +87,7 @@ export default defineConfig({
     ],
 
     socialLinks: [
-      { icon: "github", link: "https://github.com/Mackenzie-OO7/lockedin" },
+      { icon: "github", link: "https://github.com/Mackenzie-OO7/loktin" },
     ],
 
     footer: {
@@ -101,7 +101,7 @@ export default defineConfig({
 
     outline: { level: [2, 3], label: "On this page" },
     editLink: {
-      pattern: "https://github.com/Mackenzie-OO7/lockedin/edit/main/docs/:path",
+      pattern: "https://github.com/Mackenzie-OO7/loktin/edit/main/docs/:path",
       text: "Edit on GitHub",
     },
   },

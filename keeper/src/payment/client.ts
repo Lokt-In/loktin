@@ -1,4 +1,4 @@
-import * as Loktin from "lockedin";
+import * as Loktin from "plans";
 import * as TargetSavings from "target_savings";
 import { Keypair } from "@stellar/stellar-sdk";
 

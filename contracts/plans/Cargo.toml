@@ -1,6 +1,6 @@
 [package]
-name = "locked_vault"
-description = "Fixed-term USDC lock with tiered APY and projected yield"
+name = "plans"
+description = "Time-locked bill payment vault for financial discipline"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NewBill, BILL_CATEGORIES, BillCategory } from "../hooks/useBills";
+import { NewBill, BILL_CATEGORIES } from "../hooks/useBills";
 import Button from "../../../shared/components/Button";
 import Input from "../../../shared/components/Input";
 
@@ -153,9 +153,7 @@ export default function AddBillsForm({
               </label>
               <select
                 value={bill.category}
-                onChange={(e) =>
-                  update(i, "category", e.target.value as BillCategory)
-                }
+                onChange={(e) => update(i, "category", e.target.value)}
                 style={{
                   background: "var(--bg-base)",
                   color: "var(--fg-primary)",

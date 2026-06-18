@@ -15,10 +15,10 @@ const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30; // 30 days
 const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365; // 1 year
 
 #[contract]
-pub struct LockedIn;
+pub struct Plans;
 
 #[contractimpl]
-impl LockedIn {
+impl Plans {
     pub fn __constructor(env: Env, admin: Address, usdc_token: Address) {
         admin.require_auth();
 

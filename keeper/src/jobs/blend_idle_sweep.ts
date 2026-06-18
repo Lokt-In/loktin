@@ -16,7 +16,7 @@
 export async function runBlendIdleSweep() {
   console.log("\n[blend_idle_sweep] Running… (stub: Blend not yet integrated)");
   // TODO when Blend is live:
-  //   for each contract in [target_savings, locked_vault, spend_save]:
+  //   for each contract in [target_savings, locked_in, spend_save]:
   //     const idle = await getIdleBalance(contract)
   //     if (idle > threshold) await contract.deposit_to_blend({ amount: idle })
   console.log("[blend_idle_sweep] Done — no-op");

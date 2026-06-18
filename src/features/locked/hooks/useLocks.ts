@@ -9,7 +9,7 @@ import {
 } from "../../../lib/mockState";
 
 /* ─── REAL IMPORTS (restore when contract auth is fixed) ─────────────────────
-import * as LockedVault from "locked_vault";
+import * as LockedIn from "locked_in";
 import { rpcUrl } from "../../../contracts/util";
 import { buildClient, sendWithAuth } from "../../../contracts/clientHelpers";
 ─── END REAL IMPORTS ──────────────────────────────────────────────────────── */
@@ -132,8 +132,8 @@ type WalletMethods = {
 
 function makeClient(address: string, w?: WalletMethods) {
   return buildClient(
-    LockedVault.Client,
-    { ...LockedVault.networks.testnet, rpcUrl },
+    LockedIn.Client,
+    { ...LockedIn.networks.testnet, rpcUrl },
     address,
     w?.signTransaction,
     w?.signAuthEntry,

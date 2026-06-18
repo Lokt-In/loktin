@@ -16,13 +16,13 @@ fn create_token_contract<'a>(env: &Env, admin: &Address) -> (Address, TokenClien
 }
 
 // Contract setup helper
-fn create_lockedin_contract<'a>(
+fn create_plans_contract<'a>(
     env: &Env,
     admin: &Address,
     usdc_token: &Address,
-) -> LockedInClient<'a> {
-    let contract_id = env.register(LockedIn, (admin, usdc_token));
-    let client = LockedInClient::new(env, &contract_id);
+) -> PlansClient<'a> {
+    let contract_id = env.register(Plans, (admin, usdc_token));
+    let client = PlansClient::new(env, &contract_id);
     client
 }
 
@@ -53,7 +53,7 @@ fn test_initialization() {
 
     let admin = Address::generate(&env);
     let (usdc_token, _) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     assert_eq!(client.admin(), admin);
     assert_eq!(client.get_usdc_token(), usdc_token);
@@ -68,7 +68,7 @@ fn test_set_fee_percentage() {
 
     let admin = Address::generate(&env);
     let (usdc_token, _) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     client.set_fee_percentage(&500); // 5%
 
@@ -83,7 +83,7 @@ fn test_set_fee_percentage_too_high() {
 
     let admin = Address::generate(&env);
     let (usdc_token, _) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     client.set_fee_percentage(&501); // Over 5%
 }
@@ -97,7 +97,7 @@ fn test_create_cycle() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128; // 100 USDC
     mint_tokens(&env, &token, &user, amount);
@@ -123,7 +123,7 @@ fn test_create_cycle_invalid_duration_zero() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -141,7 +141,7 @@ fn test_create_cycle_invalid_duration_too_long() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -158,7 +158,7 @@ fn test_get_user_cycles() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 50_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount * 3);
@@ -184,7 +184,7 @@ fn test_add_bill() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -222,7 +222,7 @@ fn test_pay_bill() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -259,7 +259,7 @@ fn test_pay_bill_not_due() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -288,7 +288,7 @@ fn test_end_cycle() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -313,7 +313,7 @@ fn test_end_cycle_too_early() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -332,7 +332,7 @@ fn test_cancel_bill_occurrence() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -363,7 +363,7 @@ fn test_get_cycle_bills() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -408,7 +408,7 @@ fn test_add_bill_day_29_validation() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -437,7 +437,7 @@ fn test_over_allocation_protection() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128; // 100 USDC
     mint_tokens(&env, &token, &user, amount);
@@ -465,7 +465,7 @@ fn test_double_payment_prevention_recurring() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -500,7 +500,7 @@ fn test_cancel_bill_occurrence_recurring() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -538,7 +538,7 @@ fn test_cancel_bill_all_occurrences() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -574,7 +574,7 @@ fn test_batch_add_bills() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -632,7 +632,7 @@ fn test_keeper_end_cycle() {
     let user = Address::generate(&env);
     let _keeper = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -657,7 +657,7 @@ fn test_keeper_end_cycle_too_early() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -676,7 +676,7 @@ fn test_admin_transfer_and_cancel() {
     let admin = Address::generate(&env);
     let new_admin = Address::generate(&env);
     let (usdc_token, _) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     client.transfer_admin(&new_admin, &1000);
 
@@ -694,7 +694,7 @@ fn test_admin_transfer_race_condition_protection() {
     let new_admin_1 = Address::generate(&env);
     let new_admin_2 = Address::generate(&env);
     let (usdc_token, _) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     client.transfer_admin(&new_admin_1, &2000);
 
@@ -710,7 +710,7 @@ fn test_batch_cancel_bills_occurrences() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);
@@ -760,7 +760,7 @@ fn test_recurring_bill_with_recurrence_calendar() {
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
     let (usdc_token, token) = create_token_contract(&env, &admin);
-    let client = create_lockedin_contract(&env, &admin, &usdc_token);
+    let client = create_plans_contract(&env, &admin, &usdc_token);
 
     let amount = 100_000_000_000_000_000_000i128;
     mint_tokens(&env, &token, &user, amount);

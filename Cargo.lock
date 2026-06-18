@@ -770,15 +770,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
-name = "locked_vault"
-version = "0.0.1"
-dependencies = [
- "soroban-sdk",
- "stellar-xdr",
-]
-
-[[package]]
-name = "lockedin"
+name = "locked_in"
 version = "0.0.1"
 dependencies = [
  "soroban-sdk",
@@ -885,6 +877,14 @@ checksum = "f950b2377845cebe5cf8b5165cb3cc1a5e0fa5cfa3e1f7f55707d8fd82e0a7b7"
 dependencies = [
  "der",
  "spki",
+]
+
+[[package]]
+name = "plans"
+version = "0.0.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-xdr",
 ]
 
 [[package]]

@@ -2,7 +2,6 @@ import storage from "./storage";
 import {
   ISupportedWallet,
   StellarWalletsKit,
-  WalletNetwork,
   allowAllModules,
   FREIGHTER_ID,
 } from "@creit.tech/stellar-wallets-kit";
@@ -10,7 +9,7 @@ import { Horizon } from "@stellar/stellar-sdk";
 import { networkPassphrase, stellarNetwork } from "../contracts/util";
 
 const kit: StellarWalletsKit = new StellarWalletsKit({
-  network: networkPassphrase as WalletNetwork,
+  network: networkPassphrase,
   modules: allowAllModules(),
   selectedWalletId: storage.getItem("walletId") ?? FREIGHTER_ID,
 });

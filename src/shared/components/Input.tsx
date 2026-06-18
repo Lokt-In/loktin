@@ -46,11 +46,10 @@ export default function Input({
           ...style,
         }}
         onFocus={(e) => {
-          (e.target as HTMLInputElement).style.borderColor =
-            "var(--accent-primary)";
+          e.target.style.borderColor = "var(--accent-primary)";
         }}
         onBlur={(e) => {
-          (e.target as HTMLInputElement).style.borderColor = error
+          e.target.style.borderColor = error
             ? "var(--status-error)"
             : "var(--border)";
         }}

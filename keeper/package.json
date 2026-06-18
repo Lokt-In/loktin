@@ -11,9 +11,9 @@
   "dependencies": {
     "@stellar/stellar-sdk": "^14.3.1",
     "dotenv": "^17.2.3",
-    "lockedin": "file:../packages/lockedin",
+    "plans": "file:../packages/plans",
     "target_savings": "file:../packages/target_savings",
-    "locked_vault": "file:../packages/locked_vault",
+    "locked_in": "file:../packages/locked_in",
     "spend_save": "file:../packages/spend_save",
     "node-cron": "^4.2.1"
   },

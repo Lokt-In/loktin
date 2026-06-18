@@ -49,5 +49,7 @@ jobs:
         run: STELLAR_SCAFFOLD_ENV=development stellar-scaffold build --build-clients
       - run: npm run install:contracts
       - run: npm run build
-      - name: Run tests
+      - name: Run frontend tests
         run: npm test --if-present
+      - name: Run contract tests
+        run: cargo test --workspace --locked

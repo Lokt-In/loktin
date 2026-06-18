@@ -77,12 +77,11 @@ export default function Button({
       }}
       onMouseEnter={(e) => {
         if (!disabled && !isLoading) {
-          (e.currentTarget as HTMLButtonElement).style.filter =
-            "brightness(1.15)";
+          e.currentTarget.style.filter = "brightness(1.15)";
         }
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.filter = "";
+        e.currentTarget.style.filter = "";
       }}
       {...props}
     >

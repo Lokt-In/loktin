@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { Keypair } from "@stellar/stellar-sdk";
-import * as Loktin from "lockedin";
+import * as Loktin from "plans";
 import * as TargetSavings from "target_savings";
 import { runBillPayments } from "../jobs/bill_payments.js";
 import { runTargetPeriodic } from "../jobs/target_periodic.js";

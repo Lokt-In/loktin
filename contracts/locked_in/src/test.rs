@@ -5,7 +5,7 @@ use super::*;
 use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{token::StellarAssetClient, Env};
 
-fn setup() -> (Env, Address, Address, Address, LockedVaultClient<'static>) {
+fn setup() -> (Env, Address, Address, Address, LockedInClient<'static>) {
     let env = Env::default();
     env.mock_all_auths();
     env.ledger().set_timestamp(1_700_000_000);
@@ -19,8 +19,8 @@ fn setup() -> (Env, Address, Address, Address, LockedVaultClient<'static>) {
     let token_admin = StellarAssetClient::new(&env, &token_addr);
     token_admin.mint(&user, &10_000_000_000_i128); // 1000 USDC
 
-    let contract_id = env.register(LockedVault, (admin.clone(), token_addr.clone()));
-    let client = LockedVaultClient::new(&env, &contract_id);
+    let contract_id = env.register(LockedIn, (admin.clone(), token_addr.clone()));
+    let client = LockedInClient::new(&env, &contract_id);
 
     (env, admin, user, token_addr, client)
 }

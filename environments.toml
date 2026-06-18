@@ -58,8 +58,8 @@ default = true # Optional. Whether to use this account as the `--source` for com
 # reset
 # """
 
-# LockedIn contract
-[development.contracts.lockedin]
+# Plans contract
+[development.contracts.plans]
 client = true
 constructor_args = "--admin levai --usdc_token CCSN4OJD36ZAK7IT4LSHJEKRUB2JWWFP5NW7NDFZK56OHYVWKXM37V24"
 
@@ -82,7 +82,7 @@ default = true
 
 [staging.contracts]
 # Loktin core (Plans / Cycles)
-[staging.contracts.lockedin]
+[staging.contracts.plans]
 id = "CBCKKGNNNFSMTE2IPVGA5YUHSTIN4XX5MQ7LZN4MCPHAKATHWZODGXJN"
 client = true
 
@@ -96,8 +96,8 @@ client = false
 id = "CAF4L2VNNCUMBGBSHXLHGKLPPKBSF65GGXDQQIBDF4IGJWXPPBOEDBAF"
 client = true
 
-# Locked Vault — fixed-term USDC locks with tiered APY
-[staging.contracts.locked_vault]
+# Locked In — fixed-term USDC locks with tiered APY
+[staging.contracts.locked_in]
 id = "CCXMCHYO2JGPHYSJQ7ZJWAXR2SZKM2RZECOCI7R234FYS3JCGHSD5WSR"
 client = true
 

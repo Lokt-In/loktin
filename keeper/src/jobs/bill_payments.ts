@@ -1,4 +1,4 @@
-import * as Loktin from "lockedin";
+import * as Loktin from "plans";
 import { Keypair } from "@stellar/stellar-sdk";
 import { processDueBills } from "../payment/processor.js";
 

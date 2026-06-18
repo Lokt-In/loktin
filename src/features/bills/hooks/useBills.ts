@@ -9,7 +9,7 @@ import {
 } from "../../../lib/mockState";
 
 /* ─── REAL IMPORTS (restore when contract auth is fixed) ─────────────────────
-import * as LockedInContract from "lockedin";
+import * as PlansContract from "plans";
 import { rpcUrl } from "../../../contracts/util";
 import { buildClient, sendWithAuth } from "../../../contracts/clientHelpers";
 ─── END REAL IMPORTS ──────────────────────────────────────────────────────── */
@@ -196,8 +196,8 @@ type WalletMethods = {
 
 function makeClient(address: string, w?: WalletMethods) {
   return buildClient(
-    LockedInContract.Client,
-    { ...LockedInContract.networks.testnet, rpcUrl },
+    PlansContract.Client,
+    { ...PlansContract.networks.testnet, rpcUrl },
     address,
     w?.signTransaction,
     w?.signAuthEntry,
@@ -280,7 +280,7 @@ export function useBills(cycleId: bigint, startDateTs: bigint, endDateTs: bigint
           }
           recurrenceCalendar = Array.from(monthsSet).sort((a, b) => a - b);
         }
-        const category = { tag: bill.category, values: undefined } as LockedInContract.BillCategory;
+        const category = { tag: bill.category, values: undefined } as PlansContract.BillCategory;
         return [bill.name, amount, dueDate, bill.isRecurring, recurrenceCalendar, category] as const;
       });
       const contract = makeClient(address, { signTransaction, signAuthEntry });
