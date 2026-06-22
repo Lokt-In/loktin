@@ -6,7 +6,7 @@ resolver = "2"
 authors = ["ALevai"]
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/Mackenzie-OO7/loktin"
+repository = "https://github.com/Lokt-In/loktin"
 version = "0.0.1"
 
 [workspace.dependencies.soroban-sdk]

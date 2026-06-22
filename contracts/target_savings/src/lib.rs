@@ -1,6 +1,13 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, token, Address, Env, String, Vec};
+mod error;
+mod events;
+mod types;
+
+use soroban_sdk::{contract, contractimpl, token, Address, Env, String, Vec};
+
+use error::Error;
+use types::{DataKey, TargetGoal};
 
 const DAY_IN_LEDGERS: u32 = 17280; // ~24h
 const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30;
@@ -8,54 +15,6 @@ const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365;
 
 const FORFEIT_BPS: u32 = 100; // 1% on early withdrawal
 const BPS_DENOMINATOR: i128 = 10_000;
-
-// ── Types ────────────────────────────────────────────────────────────
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TargetGoal {
-    pub id: u64,
-    pub user: Address,
-    pub name: String,
-    pub target_amount: i128,
-    pub period_seconds: u64,
-    pub period_amount: i128,
-    pub start_date: u64,
-    pub end_date: u64,
-    pub deposited: i128,
-    pub last_deposit_date: u64,
-    pub missed_periods: u32,
-    pub is_complete: bool,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DataKey {
-    Admin,
-    Keeper,
-    UsdcToken,
-    FeeRecipient,
-    GoalCounter,
-    Goal(u64),
-    UserGoals(Address),
-}
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum Error {
-    Unauthorized = 1,
-    AdminNotSet = 2,
-    GoalNotFound = 10,
-    GoalAlreadyComplete = 11,
-    InvalidAmount = 12,
-    InvalidDuration = 13,
-    InvalidPeriod = 14,
-    PeriodNotDue = 15,
-    InsufficientUserBalance = 16,
-    InsufficientUserAllowance = 17,
-    NotGoalOwner = 18,
-}
 
 // ── Contract ─────────────────────────────────────────────────────────
 
@@ -74,7 +33,7 @@ impl TargetSavings {
         env.storage().instance().set(&DataKey::GoalCounter, &0u64);
     }
 
-    // ── Admin / config ──
+    // Admin / config
 
     pub fn admin(env: Env) -> Result<Address, Error> {
         env.storage().instance().get(&DataKey::Admin).ok_or(Error::AdminNotSet)
@@ -106,10 +65,10 @@ impl TargetSavings {
         env.storage().instance().get(&DataKey::UsdcToken).unwrap()
     }
 
-    // ── User-facing ──
+    // User functions
 
-    /// Create a new target savings goal. The user must have approved the contract
-    /// to spend USDC up to `target_amount` on the USDC token contract.
+    // Create a new target savings goal. The user must have approved the contract
+    // to spend USDC up to `target_amount` on the USDC token contract.
     pub fn create_target(
         env: Env,
         user: Address,
@@ -144,7 +103,7 @@ impl TargetSavings {
             start_date: now,
             end_date,
             deposited: 0,
-            last_deposit_date: now, // first period starts now (next due in `period_seconds`)
+            last_deposit_date: now,
             missed_periods: 0,
             is_complete: false,
         };
@@ -160,11 +119,11 @@ impl TargetSavings {
         env.storage().persistent().set(&DataKey::UserGoals(user.clone()), &user_goals);
         Self::extend_ttl(&env, &DataKey::UserGoals(user.clone()));
 
-        env.events().publish((symbol_short!("created"), user), id);
+        events::TargetCreated { target_id: id, user }.publish(&env);
         Ok(id)
     }
 
-    /// Manually deposit additional funds into a goal (top-up).
+    // Manually deposit additional funds into a goal (to.
     pub fn manual_deposit(env: Env, user: Address, target_id: u64, amount: i128) -> Result<(), Error> {
         user.require_auth();
         if amount <= 0 {
@@ -185,7 +144,7 @@ impl TargetSavings {
         env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
         Self::extend_ttl(&env, &DataKey::Goal(target_id));
 
-        env.events().publish((symbol_short!("manualdep"), user), (target_id, amount));
+        events::ManualDeposit { target_id, user, amount }.publish(&env);
         Ok(())
     }
 
@@ -224,11 +183,11 @@ impl TargetSavings {
         env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
         Self::extend_ttl(&env, &DataKey::Goal(target_id));
 
-        env.events().publish((symbol_short!("withdraw"), user), (target_id, to_user, forfeit));
+        events::Withdrawn { target_id, user, to_user, forfeit }.publish(&env);
         Ok(to_user)
     }
 
-    // ── Keeper-facing ──
+    // Keeper
 
     /// Process a single period for a goal: pulls `period_amount` from the user's wallet
     /// via `transfer_from`. If the user lacks balance/allowance, logs a missed period.
@@ -258,7 +217,7 @@ impl TargetSavings {
             goal.last_deposit_date = next_due;
             env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
             Self::extend_ttl(&env, &DataKey::Goal(target_id));
-            env.events().publish((symbol_short!("missed"), goal.user.clone()), target_id);
+            events::Missed { target_id, user: goal.user.clone() }.publish(&env);
             return Ok(());
         }
 
@@ -280,7 +239,7 @@ impl TargetSavings {
 
         env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
         Self::extend_ttl(&env, &DataKey::Goal(target_id));
-        env.events().publish((symbol_short!("deposit"), goal.user.clone()), (target_id, goal.period_amount));
+        events::PeriodDeposit { target_id, user: goal.user.clone(), amount: goal.period_amount }.publish(&env);
         Ok(())
     }
 
@@ -301,14 +260,14 @@ impl TargetSavings {
     pub fn deposit_to_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
-        env.events().publish((symbol_short!("blendDep"),), amount);
+        events::BlendDeposit { amount }.publish(&env);
         Ok(())
     }
 
     pub fn withdraw_from_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
-        env.events().publish((symbol_short!("blendWd"),), amount);
+        events::BlendWithdraw { amount }.publish(&env);
         Ok(())
     }
 
