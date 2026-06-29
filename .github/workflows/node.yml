@@ -43,8 +43,11 @@ jobs:
             echo "stellar-scaffold already installed. Clear cache to force reinstall."
           fi
       - run: npm ci
-      - name: Build clients before building the project
-        run: STELLAR_SCAFFOLD_ENV=development stellar-scaffold build --build-clients
+      # The contract client packages (packages/*) are committed to the repo, so we
+      # build them from source rather than regenerating them from a live deploy.
+      # Regenerating requires deploying contracts to a network whose constructors
+      # reference the testnet USDC SAC; that can't run on a throwaway local network.
+      # Bindings are regenerated manually (see packages/*/README.md) when contracts change.
       - run: npm run install:contracts
       # lint + prettier run AFTER the client packages are built: the type-aware
       # ESLint rules (no-unsafe-*) need the generated package types in
