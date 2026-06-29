@@ -4,47 +4,29 @@ import Button from "./Button";
 
 /**
  * Onboarding prompt: if the connected wallet is missing a USDC trustline, show
- * a one-time "Add USDC trustline" action plus a link to the faucet. Renders
- * nothing once the trustline exists (or before we know).
+ * a one-time "Add USDC trustline" action plus a faucet link. Renders nothing
+ * once the trustline exists. Kept deliberately plain pending the redesign.
  */
 export default function UsdcTrustlinePrompt() {
   const { hasTrustline, submitting, error, addTrustline } = useUsdcTrustline();
 
-  // Only surface the prompt once we know a trustline is missing.
+  // Only surface once we know a trustline is missing.
   if (hasTrustline !== false) return null;
 
   return (
     <div
       style={{
-        border: "1px solid var(--border-accent)",
-        borderLeft: "4px solid var(--accent-primary)",
+        border: "1px solid var(--border)",
         padding: "var(--sp-4)",
         margin: "var(--sp-6) var(--sp-6) 0",
-        background: "var(--bg-surface)",
       }}
     >
       <p
-        style={{
-          fontSize: "var(--font-size-xs)",
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: "var(--fg-muted)",
-          marginBottom: "var(--sp-2)",
-        }}
-      >
-        Set up USDC
-      </p>
-      <p
-        style={{
-          fontSize: "var(--font-size-sm)",
-          color: "var(--fg-secondary)",
-          marginBottom: "var(--sp-3)",
-          lineHeight: 1.5,
-        }}
+        style={{ fontSize: "var(--font-size-sm)", marginBottom: "var(--sp-3)" }}
       >
         Your wallet can&apos;t hold USDC yet. Add a one-time USDC trustline,
-        then grab test USDC from the faucet before saving. (Requires a funded
-        account — get test XLM from the wallet menu first.)
+        then get test USDC from the faucet. (Needs a funded account — use
+        &ldquo;Get test XLM&rdquo; in the wallet menu first.)
       </p>
       {error && (
         <p
@@ -74,8 +56,7 @@ export default function UsdcTrustlinePrompt() {
           rel="noopener noreferrer"
           style={{
             fontSize: "var(--font-size-sm)",
-            color: "var(--fg-accent, var(--accent-primary))",
-            textDecoration: "underline",
+            color: "var(--accent-primary)",
           }}
         >
           Get test USDC →
