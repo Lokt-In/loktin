@@ -1,6 +1,13 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env};
+mod error;
+mod events;
+mod types;
+
+use soroban_sdk::{contract, contractimpl, token, Address, Env};
+
+use error::Error;
+use types::{DataKey, SpendSavePosition};
 
 const DAY_IN_LEDGERS: u32 = 17280;
 const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30;
@@ -9,40 +16,6 @@ const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365;
 const BPS_DENOMINATOR: i128 = 10_000;
 const SECONDS_PER_DAY: u64 = 86_400;
 const WITHDRAWAL_DAY: u32 = 28; // day of month
-
-// ── Types ────────────────────────────────────────────────────────────
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SpendSavePosition {
-    pub user: Address,
-    pub save_percentage: u32,    // basis points, 100..5000 (1%..50%)
-    pub saved_balance: i128,
-    pub total_spent_lifetime: i128,
-    pub total_saved_lifetime: i128,
-    pub created_date: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DataKey {
-    Admin,
-    UsdcToken,
-    Position(Address),
-}
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum Error {
-    Unauthorized = 1,
-    AdminNotSet = 2,
-    NotEnrolled = 10,
-    InvalidPercentage = 11,
-    InvalidAmount = 12,
-    NotWithdrawalDay = 13,
-    InsufficientSavedBalance = 14,
-}
 
 // ── Contract ─────────────────────────────────────────────────────────
 
@@ -67,9 +40,9 @@ impl SpendSave {
         env.storage().instance().get(&DataKey::UsdcToken).unwrap()
     }
 
-    // ── User-facing ──
+    // User functions
 
-    /// Enroll or update save percentage (basis points: 100=1%, 5000=50%).
+    // Enroll or update save percentage (basis points: 100=1%, 5000=50%).
     pub fn enroll(env: Env, user: Address, save_percentage_bps: u32) -> Result<(), Error> {
         user.require_auth();
         if save_percentage_bps < 100 || save_percentage_bps > 5000 {
@@ -95,12 +68,12 @@ impl SpendSave {
         env.storage().persistent().set(&DataKey::Position(user.clone()), &position);
         Self::extend_ttl(&env, &DataKey::Position(user.clone()));
 
-        env.events().publish((symbol_short!("enrolled"), user), save_percentage_bps);
+        events::Enrolled { user, save_percentage_bps }.publish(&env);
         Ok(())
     }
 
-    /// Spend USDC through Loktin: routes (1-pct) to recipient, (pct) to vault.
-    /// Pulls `total_amount` from user's wallet. Returns (sent_to_recipient, saved).
+    // Spend USDC through Loktin: routes (1-pct) to recipient, (pct) to vault.
+    // Pulls `total_amount` from user's wallet. Returns (sent_to_recipient, saved).
     pub fn spend(env: Env, user: Address, recipient: Address, total_amount: i128) -> Result<(i128, i128), Error> {
         user.require_auth();
         if total_amount <= 0 {
@@ -127,11 +100,11 @@ impl SpendSave {
         env.storage().persistent().set(&DataKey::Position(user.clone()), &position);
         Self::extend_ttl(&env, &DataKey::Position(user.clone()));
 
-        env.events().publish((symbol_short!("spend"), user), (recipient, sent, saved));
+        events::Spent { user, recipient, sent, saved }.publish(&env);
         Ok((sent, saved))
     }
 
-    /// Withdraw from saved_balance. Reverts unless current UTC date is the 28th.
+    // Withdraw from saved_balance. Reverts unless current UTC date is the 28th.
     pub fn withdraw(env: Env, user: Address, amount: i128) -> Result<(), Error> {
         user.require_auth();
         if amount <= 0 {
@@ -154,11 +127,11 @@ impl SpendSave {
         env.storage().persistent().set(&DataKey::Position(user.clone()), &position);
         Self::extend_ttl(&env, &DataKey::Position(user.clone()));
 
-        env.events().publish((symbol_short!("withdraw"), user), amount);
+        events::Withdrawn { user, amount }.publish(&env);
         Ok(())
     }
 
-    // ── Reads ──
+    // Read functions
 
     pub fn get_position(env: Env, user: Address) -> Result<SpendSavePosition, Error> {
         env.storage().persistent().get(&DataKey::Position(user)).ok_or(Error::NotEnrolled)
@@ -174,19 +147,19 @@ impl SpendSave {
         Self::utc_day_of_month(env.ledger().timestamp())
     }
 
-    // ── Blend integration stubs ──
+    // Blend integration stubs
 
     pub fn deposit_to_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
-        env.events().publish((symbol_short!("blendDep"),), amount);
+        events::BlendDeposit { amount }.publish(&env);
         Ok(())
     }
 
     pub fn withdraw_from_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
-        env.events().publish((symbol_short!("blendWd"),), amount);
+        events::BlendWithdraw { amount }.publish(&env);
         Ok(())
     }
 
@@ -194,7 +167,7 @@ impl SpendSave {
         0
     }
 
-    // ── Internal helpers ──
+    // Internal helpers
 
     fn token_client(env: &Env) -> token::TokenClient {
         let token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
@@ -209,8 +182,7 @@ impl SpendSave {
         Self::utc_day_of_month(env.ledger().timestamp()) == WITHDRAWAL_DAY
     }
 
-    /// Compute UTC day-of-month (1-31) from a unix timestamp.
-    /// Uses the standard civil calendar algorithm.
+    // Compute UTC day-of-month (1-31) from a unix timestamp.
     fn utc_day_of_month(timestamp: u64) -> u32 {
         let days = timestamp / SECONDS_PER_DAY;
         // Civil from days (Howard Hinnant's date algorithm)

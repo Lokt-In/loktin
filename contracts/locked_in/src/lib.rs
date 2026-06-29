@@ -1,6 +1,14 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env, Map, Vec};
+mod error;
+mod events;
+mod test;
+mod types;
+
+use soroban_sdk::{contract, contractimpl, token, Address, Env, Map, Vec};
+
+use error::Error;
+use types::{DataKey, Lock};
 
 const DAY_IN_LEDGERS: u32 = 17280;
 const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30;
@@ -9,48 +17,6 @@ const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365;
 const SECONDS_PER_MONTH: u64 = 2_592_000; // 30 days
 const SECONDS_PER_YEAR: i128 = 31_536_000;
 const BPS_DENOMINATOR: i128 = 10_000;
-
-// ── Types ────────────────────────────────────────────────────────────
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Lock {
-    pub id: u64,
-    pub user: Address,
-    pub amount: i128,
-    pub apy_basis_points: u32,
-    pub duration_seconds: u64,
-    pub start_date: u64,
-    pub end_date: u64,
-    pub projected_yield: i128,
-    pub is_unlocked: bool,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DataKey {
-    Admin,
-    UsdcToken,
-    LockCounter,
-    Lock(u64),
-    UserLocks(Address),
-    ApyTiers, // Map<u32, u32>: duration_months -> apy_bps
-}
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum Error {
-    Unauthorized = 1,
-    AdminNotSet = 2,
-    LockNotFound = 10,
-    LockAlreadyUnlocked = 11,
-    LockNotMatured = 12,
-    InvalidAmount = 13,
-    InvalidDuration = 14,
-    NotLockOwner = 15,
-    DurationTierMissing = 16,
-}
 
 // ── Contract ─────────────────────────────────────────────────────────
 
@@ -86,7 +52,7 @@ impl LockedIn {
         let mut tiers: Map<u32, u32> = env.storage().instance().get(&DataKey::ApyTiers).unwrap();
         tiers.set(duration_months, apy_basis_points);
         env.storage().instance().set(&DataKey::ApyTiers, &tiers);
-        env.events().publish((symbol_short!("setapy"),), (duration_months, apy_basis_points));
+        events::ApyTierSet { duration_months, apy_basis_points }.publish(&env);
         Ok(())
     }
 
@@ -103,10 +69,10 @@ impl LockedIn {
         env.storage().instance().get(&DataKey::UsdcToken).unwrap()
     }
 
-    // ── User-facing ──
+    // ── for users ──
 
-    /// Lock USDC for a fixed duration. Returns the lock id.
-    /// Computes and stores projected_yield (display only — paid via Blend later).
+    // Lock USDC for a fixed duration. Returns the lock id.
+    // Computes and stores projected_yield (display only for now).
     pub fn lock(env: Env, user: Address, amount: i128, duration_months: u32) -> Result<u64, Error> {
         user.require_auth();
         if amount <= 0 {
@@ -150,12 +116,12 @@ impl LockedIn {
         env.storage().persistent().set(&DataKey::UserLocks(user.clone()), &user_locks);
         Self::extend_ttl(&env, &DataKey::UserLocks(user.clone()));
 
-        env.events().publish((symbol_short!("locked"), user), (id, amount, projected_yield));
+        events::Locked { lock_id: id, user, amount, projected_yield }.publish(&env);
         Ok(id)
     }
 
-    /// Unlock and return principal. Reverts if before end_date.
-    /// (Yield from Blend is added when Blend integration is live.)
+    // Unlock and return principal. Reverts if before end_date.
+    // (Yield from Blend is added when Blend integration is live.)
     pub fn unlock(env: Env, user: Address, lock_id: u64) -> Result<i128, Error> {
         user.require_auth();
         let mut lock = Self::get_lock(env.clone(), lock_id)?;
@@ -171,7 +137,6 @@ impl LockedIn {
         }
 
         let token = Self::token_client(&env);
-        // Today: return principal only. Future: principal + actual blend-accrued yield.
         let payout = lock.amount;
         token.transfer(&env.current_contract_address(), &user, &payout);
 
@@ -179,11 +144,11 @@ impl LockedIn {
         env.storage().persistent().set(&DataKey::Lock(lock_id), &lock);
         Self::extend_ttl(&env, &DataKey::Lock(lock_id));
 
-        env.events().publish((symbol_short!("unlocked"), user), (lock_id, payout));
+        events::Unlocked { lock_id, user, payout }.publish(&env);
         Ok(payout)
     }
 
-    // ── Reads ──
+    // Read functions
 
     pub fn get_lock(env: Env, lock_id: u64) -> Result<Lock, Error> {
         env.storage().persistent().get(&DataKey::Lock(lock_id)).ok_or(Error::LockNotFound)
@@ -195,19 +160,19 @@ impl LockedIn {
             .unwrap_or_else(|| Vec::new(&env))
     }
 
-    // ── Blend integration stubs ──
+    // Blend integration stubs
 
     pub fn deposit_to_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
-        env.events().publish((symbol_short!("blendDep"),), amount);
+        events::BlendDeposit { amount }.publish(&env);
         Ok(())
     }
 
     pub fn withdraw_from_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
-        env.events().publish((symbol_short!("blendWd"),), amount);
+        events::BlendWithdraw { amount }.publish(&env);
         Ok(())
     }
 
@@ -215,7 +180,7 @@ impl LockedIn {
         0
     }
 
-    // ── Internal ──
+    // Internal functions
 
     fn next_id(env: &Env) -> u64 {
         let counter: u64 = env.storage().instance().get(&DataKey::LockCounter).unwrap_or(0);
@@ -233,6 +198,3 @@ impl LockedIn {
         env.storage().persistent().extend_ttl(key, LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND);
     }
 }
-
-#[cfg(test)]
-mod test;
