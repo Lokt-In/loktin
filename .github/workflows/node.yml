@@ -44,7 +44,7 @@ jobs:
           fi
       - run: npm ci
       - name: Build clients before building the project
-        run: STELLAR_SCAFFOLD_ENV=development stellar-scaffold build --build-clients
+        run: STELLAR_SCAFFOLD_ENV=staging stellar-scaffold build --build-clients
       - run: npm run install:contracts
       # lint + prettier run AFTER the client packages are built: the type-aware
       # ESLint rules (no-unsafe-*) need the generated package types in
