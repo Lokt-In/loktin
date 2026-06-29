@@ -1,98 +1,82 @@
-import {
+import type {
   Client as ContractClient,
-  type AssembledTransaction,
-  type ClientOptions,
-  type SentTransaction,
+  ClientOptions,
+  AssembledTransaction,
 } from "@stellar/stellar-sdk/contract";
-import { rpcUrl } from "./util";
 
 /**
- * Shared helpers for talking to the generated Soroban contract clients
- * (`packages/{plans,target_savings,locked_in,spend_save}`).
+ * Helpers for talking to the Loktin Soroban contracts from the generated
+ * TypeScript bindings (`packages/*`).
  *
- * Read-only calls are simulated and need no signers. State-changing calls
- * require the connected wallet's `signTransaction`, plus `signAuthEntry` for
- * invocations that the user must authorize (e.g. `create_cycle`, `lock`,
- * `manual_deposit`, `enroll`, `spend`, `withdraw`).
+ * Auth model (the important bit):
+ * Every user-facing contract call (`lock`, `create_target`, `spend`, …) requires
+ * `user.require_auth()`, and several of them make a nested `token.transfer`
+ * sub-invocation that *also* requires the same user's auth. When the connected
+ * wallet is both the transaction source **and** the only required authorizer,
+ * a single transaction signature (source-account auth) covers the whole
+ * invocation tree — no per-entry signing is needed. We therefore construct the
+ * client with `publicKey` set to the connected address so simulation attributes
+ * those `require_auth` calls to the invoker, and only fall back to
+ * `signAuthEntry` when the contract genuinely needs a *different* signer
+ * (cross-contract or contract-account auth).
  */
-
-/** Network config shape exposed by a generated client's `networks.<env>`. */
-export interface ContractNetwork {
-  contractId: string;
-  networkPassphrase: string;
-  /** Optional RPC override; defaults to the app-configured `rpcUrl`. */
-  rpcUrl?: string;
-}
 
 type SignTransaction = ClientOptions["signTransaction"];
 type SignAuthEntry = ClientOptions["signAuthEntry"];
 
-/** Constructor signature shared by every generated contract `Client`. */
-type GeneratedClientCtor<T extends ContractClient> = new (
-  options: ClientOptions,
-) => T;
-
 /**
- * Build a generated contract client wired to the connected wallet. Pass the
- * generated `Client` class and its `networks.<env>` entry; signers are optional
- * for read-only usage.
+ * Build a typed contract client from a generated binding's `Client` class.
+ *
+ * @param ClientCtor  The binding's `Client` class (e.g. `LockedIn.Client`).
+ * @param network     `{ ...Binding.networks.testnet, rpcUrl }` — carries
+ *                    `networkPassphrase`, `contractId`, and `rpcUrl`.
+ * @param publicKey   Connected wallet address; becomes the invoker.
+ * @param signTransaction / signAuthEntry  Wallet signers (omit for read-only).
  */
 export function buildClient<T extends ContractClient>(
-  Ctor: GeneratedClientCtor<T>,
-  network: ContractNetwork,
+  ClientCtor: new (options: ClientOptions) => T,
+  network: ClientOptions,
   publicKey: string,
   signTransaction?: SignTransaction,
   signAuthEntry?: SignAuthEntry,
 ): T {
-  const url = network.rpcUrl ?? rpcUrl;
-  return new Ctor({
-    contractId: network.contractId,
-    networkPassphrase: network.networkPassphrase,
-    rpcUrl: url,
-    allowHttp: url.startsWith("http://"),
+  return new ClientCtor({
+    ...network,
     publicKey,
     signTransaction,
     signAuthEntry,
+    allowHttp: network.rpcUrl?.startsWith("http://") ?? false,
   });
 }
 
 /**
- * Sign and submit a state-changing `AssembledTransaction`, then poll to
- * completion.
+ * Sign and submit a state-changing call assembled by a binding method.
  *
- * In Loktin the connected wallet is both the source account and the authorizing
- * user, so `signAndSend()` signs the invoker auth entries (via the client's
- * `signAuthEntry`) and the envelope (via `signTransaction`). If a *different*
- * account must authorize an entry (non-invoker), those are signed first.
+ * Reads (e.g. `get_user_locks`) don't go through here — call `.simulate()` and
+ * read `.result` directly. This is only for writes that must land on-chain.
+ *
+ * @param tx             The `AssembledTransaction` returned by a binding method.
+ * @param address        Connected wallet address (the expected auth-entry signer).
+ * @param signAuthEntry  Wallet auth-entry signer; only consulted if the call
+ *                       requires signatures from someone other than the invoker.
+ * @returns the parsed contract return value.
  */
 export async function sendWithAuth<T>(
   tx: AssembledTransaction<T>,
-  publicKey?: string,
+  address: string,
   signAuthEntry?: SignAuthEntry,
-): Promise<SentTransaction<T>> {
-  const needsNonInvoker = tx.needsNonInvokerSigningBy?.() ?? [];
-  if (needsNonInvoker.length > 0 && signAuthEntry && publicKey) {
-    await tx.signAuthEntries({ address: publicKey, signAuthEntry });
+): Promise<T> {
+  // Addresses (other than the invoker) whose auth entries still need signing.
+  const needsSigning = tx.needsNonInvokerSigningBy();
+  if (needsSigning.length > 0) {
+    if (!signAuthEntry) {
+      throw new Error(
+        `This action needs an auth signature from: ${needsSigning.join(", ")}`,
+      );
+    }
+    await tx.signAuthEntries({ address, signAuthEntry });
   }
-  return tx.signAndSend();
-}
 
-/**
- * Decode common Soroban scalar return shapes — a raw bigint/number/string, or a
- * wrapped `{ i128 | u64 | u32 }` — into a bigint. Returns 0n for anything else.
- */
-export function extractValue(val: unknown): bigint {
-  if (typeof val === "bigint") return val;
-  if (typeof val === "number") return BigInt(Math.trunc(val));
-  if (typeof val === "string") return BigInt(val);
-  if (val && typeof val === "object") {
-    const v = val as {
-      i128?: string | number;
-      u64?: string | number;
-      u32?: string | number;
-    };
-    const raw = v.i128 ?? v.u64 ?? v.u32;
-    if (raw !== undefined) return BigInt(raw);
-  }
-  return 0n;
+  const sent = await tx.signAndSend();
+  return sent.result;
 }

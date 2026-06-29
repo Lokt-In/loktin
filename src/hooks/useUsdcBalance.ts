@@ -2,14 +2,16 @@ import { useState, useEffect, useCallback } from "react";
 import { useWallet } from "./useWallet";
 import { getMockBalance } from "../lib/mockState";
 
-// Known USDC test token on testnet (matches Loktin's `usdc_token`)
+// Circle-issued testnet USDC Stellar Asset Contract (SAC).
+// Asset: USDC, issuer GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5.
+// This is the same `usdc_token` the Loktin contracts are deployed against.
+// Users acquire it via the Circle testnet faucet after adding a USDC trustline.
 export const USDC_CONTRACT_ID =
-  "CCD6TIYLX2PJPFWW2RBNZHAUJPMJVECIPVCILF2NYZWR5GYYDXRM4WHM";
+  "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
 const USDC_DECIMALS = 7;
 
 /* ─── MOCK IMPLEMENTATION ─────────────────────────────────────────────────────
  * Returns mock USDC balance from localStorage instead of querying the chain.
- * Real implementation is below (commented out). Restore by un-commenting.
  * ─────────────────────────────────────────────────────────────────────────── */
 
 export function useUsdcBalance() {
@@ -39,7 +41,7 @@ export function useUsdcBalance() {
   return { balance, formatted, loading, refresh };
 }
 
-/* ─── REAL IMPLEMENTATION (restore when contract auth is fixed) ───────────────
+/* Actual implementation 
 import {
   Contract,
   rpc as StellarRpc,
@@ -110,4 +112,4 @@ export function useUsdcBalance(contractId: string = USDC_CONTRACT_ID) {
 
   return { balance, formatted, loading, refresh };
 }
-─── END REAL IMPLEMENTATION ─────────────────────────────────────────────── */
+*/
