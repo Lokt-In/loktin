@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Lock } from "../hooks/useLocks";
 import Card from "../../../shared/components/Card";
 import Badge from "../../../shared/components/Badge";
@@ -37,6 +38,8 @@ export default function LockCard({ lock, onUnlock }: Props) {
   const secondsLeft = Math.max(0, Number(lock.end_date) - now);
   const isMature = now >= Number(lock.end_date);
 
+  const [unlocking, setUnlocking] = useState(false);
+
   const handleUnlock = async () => {
     if (
       !confirm(
@@ -44,9 +47,14 @@ export default function LockCard({ lock, onUnlock }: Props) {
       )
     )
       return;
-    const amt = await onUnlock(lock.id);
-    if (amt !== null)
-      alert(`Unlocked ${(Number(amt) / 10_000_000).toFixed(2)} USDC.`);
+    setUnlocking(true);
+    try {
+      const amt = await onUnlock(lock.id);
+      if (amt !== null)
+        alert(`Unlocked ${(Number(amt) / 10_000_000).toFixed(2)} USDC.`);
+    } finally {
+      setUnlocking(false);
+    }
   };
 
   return (
@@ -220,7 +228,8 @@ export default function LockCard({ lock, onUnlock }: Props) {
           variant={isMature ? "primary" : "muted"}
           size="sm"
           onClick={() => void handleUnlock()}
-          disabled={!isMature}
+          disabled={!isMature || unlocking}
+          isLoading={unlocking}
         >
           {isMature
             ? "Unlock & Withdraw"
