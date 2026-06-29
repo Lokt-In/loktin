@@ -46,3 +46,4 @@ packages/*/dist
 # generated contract client imports
 src/contracts/*
 !src/contracts/util.ts
+!src/contracts/clientHelpers.ts
