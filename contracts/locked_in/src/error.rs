@@ -13,4 +13,5 @@ pub enum Error {
     InvalidDuration = 14,
     NotLockOwner = 15,
     DurationTierMissing = 16,
+    PoolNotSet = 17,
 }

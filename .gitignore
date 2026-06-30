@@ -51,4 +51,5 @@ src/contracts/*
 !src/contracts/util.ts
 !src/contracts/clientHelpers.ts
 
+# misc
 planning/
