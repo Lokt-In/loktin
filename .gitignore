@@ -5,6 +5,9 @@ target
 # project identity and alias files will be in .config/stellar
 .config
 
+# local agent settings
+.claude/
+
 # test snapshot folders from sample contracts
 test_snapshots
 

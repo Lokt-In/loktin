@@ -1,5 +1,6 @@
 import { Outlet } from "react-router-dom";
 import DashboardSidebar from "./DashboardSidebar";
+import UsdcTrustlinePrompt from "../components/UsdcTrustlinePrompt";
 
 export default function DashboardLayout() {
   return (
@@ -16,6 +17,7 @@ export default function DashboardLayout() {
       >
         <DashboardSidebar />
         <div style={{ flex: 1, minWidth: 0 }}>
+          <UsdcTrustlinePrompt />
           <Outlet />
         </div>
       </div>
