@@ -25,7 +25,7 @@ const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
 interface Props {
   spenderContract: string;
   requiredAmount: bigint; // raw stroops
-  expirationLedger?: number; // optional ledger TTL for the allowance
+  endDate?: bigint; // goal end (unix seconds); allowance expires then, capped at the network max
   onReady: () => void; // called when allowance is sufficient
   label?: string; // override prompt label
 }
@@ -33,6 +33,7 @@ interface Props {
 export default function UsdcAllowance({
   spenderContract,
   requiredAmount,
+  endDate,
   onReady,
   label,
 }: Props) {
@@ -105,7 +106,20 @@ export default function UsdcAllowance({
       const usdcContract = new Contract(USDC_CONTRACT_ID);
 
       const latestLedger = (await server.getLatestLedger()).sequence;
-      const expirationLedger = latestLedger + 535_680; // ~30 days at 5s/ledger
+      // Expire the allowance at the goal's end date so one approval covers every
+      // periodic debit for the whole goal. Soroban entries can't outlive the
+      // network's max entry TTL (~3.11M ledgers ≈ 6 months), so cap there; goals
+      // longer than that need a re-approval (no way around the network limit).
+      const MAX_TTL_LEDGERS = 3_000_000; // safe margin under the network max
+      let ledgersToExpiry = 535_680; // ~30d fallback when no end date is given
+      if (endDate != null) {
+        const nowSecs = BigInt(Math.floor(Date.now() / 1000));
+        const secsUntilEnd = endDate > nowSecs ? Number(endDate - nowSecs) : 0;
+        // +1 day buffer so the allowance outlives the final scheduled debit
+        ledgersToExpiry = Math.ceil((secsUntilEnd + 86_400) / 5);
+      }
+      const expirationLedger =
+        latestLedger + Math.min(ledgersToExpiry, MAX_TTL_LEDGERS);
 
       const op = usdcContract.call(
         "approve",
