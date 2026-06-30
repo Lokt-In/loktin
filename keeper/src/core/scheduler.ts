@@ -4,13 +4,21 @@ import * as Loktin from "plans";
 import * as TargetSavings from "target_savings";
 import { runBillPayments } from "../jobs/bill_payments.js";
 import { runTargetPeriodic } from "../jobs/target_periodic.js";
-import { runBlendIdleSweep } from "../jobs/blend_idle_sweep.js";
-import { runBlendTopUp } from "../jobs/blend_top_up.js";
+import {
+  runBlendIdleSweep,
+  type BlendSweepConfig,
+} from "../jobs/blend_idle_sweep.js";
+import {
+  runReserveTopUp,
+  type ReserveTopUpConfig,
+} from "../jobs/reserve_top_up.js";
 
 export type SchedulerConfig = {
   loktinContract: Loktin.Client;
   targetSavingsContract: TargetSavings.Client;
   adminKeypair: Keypair;
+  blendSweep?: BlendSweepConfig;
+  reserveTopUp?: ReserveTopUpConfig;
   schedules: {
     billPayments: string; // default '0 12 * * *' (daily 12:00 UTC)
     targetPeriodic: string; // default '0 0 * * *'  (daily 00:00 UTC)
@@ -42,7 +50,7 @@ export function startScheduler(cfg: SchedulerConfig) {
   console.log(`     - bill_payments:    ${cfg.schedules.billPayments}`);
   console.log(`     - target_periodic:  ${cfg.schedules.targetPeriodic}`);
   console.log(
-    `     - blend_idle_sweep: ${cfg.schedules.blendIdleSweep} (stub)`,
+    `     - blend_idle_sweep: ${cfg.schedules.blendIdleSweep}${cfg.blendSweep ? "" : " (no targets configured)"}`,
   );
   console.log("   Press Ctrl+C to stop.\n");
 
@@ -62,7 +70,13 @@ export function startScheduler(cfg: SchedulerConfig) {
 
   cron.schedule(
     cfg.schedules.blendIdleSweep,
-    safeRun("blend_idle_sweep", () => runBlendIdleSweep()),
+    safeRun("blend_idle_sweep", () => runBlendIdleSweep(cfg.blendSweep)),
+  );
+
+  // Reserve top-up runs on the same cadence as the sweep.
+  cron.schedule(
+    cfg.schedules.blendIdleSweep,
+    safeRun("reserve_top_up", () => runReserveTopUp(cfg.reserveTopUp)),
   );
 
   process.on("SIGINT", () => {
@@ -86,8 +100,8 @@ export async function runAllOnce(cfg: SchedulerConfig) {
   await safeRun("target_periodic", () =>
     runTargetPeriodic(cfg.targetSavingsContract, cfg.adminKeypair),
   )();
-  await safeRun("blend_idle_sweep", () => runBlendIdleSweep())();
-  await safeRun("blend_top_up", () => runBlendTopUp())();
+  await safeRun("blend_idle_sweep", () => runBlendIdleSweep(cfg.blendSweep))();
+  await safeRun("reserve_top_up", () => runReserveTopUp(cfg.reserveTopUp))();
   console.log("\n✓ All jobs complete");
 }
 
