@@ -1,93 +1,114 @@
 import * as TargetSavings from "target_savings";
 import { Keypair } from "@stellar/stellar-sdk";
-import { Buffer } from "buffer";
+import { withRetry } from "../core/retry.js";
+import { getActiveGoalIds } from "../data/goalIndex.js";
 
 /**
- * Job: for each Target Savings goal that has a due period, call `process_period`.
- * Insufficient user balance/allowance => contract logs a missed period (no error to us).
+ * Job: for each Target Savings goal with a due period, call `process_period`,
+ * which pulls `period_amount` from the user's wallet via `transfer_from`.
+ * Insufficient balance/allowance => the contract records a missed period (no throw).
  *
- * The keeper signs as the admin/keeper account configured in .env.
+ * Goal selection:
+ *  - If the off-chain index (Supabase) has active goals, process exactly those.
+ *  - Otherwise fall back to walking goal ids 1..N on chain, stopping after a few
+ *    consecutive "not found" reads. (Ids are assigned sequentially.)
+ * Either way, the on-chain goal is the source of truth for due-ness.
+ *
+ * Signing: the keeper is the goal's keeper and the tx source, so a single
+ * source-account signature authorizes `process_period` (the client is built with
+ * a node signer in payment/client.ts, so `.signAndSend()` is enough).
  */
 
-function makeAuthSigner(keypair: Keypair) {
-  return {
-    signAuthEntry: async (entryXdr: string) => {
-      const signature = keypair.sign(Buffer.from(entryXdr, "base64"));
-      return {
-        signedAuthEntry: signature.toString("base64"),
-        signerAddress: keypair.publicKey(),
-      };
-    },
-  };
-}
+const MAX_GOAL_ID = 1000n;
+const MAX_CONSECUTIVE_MISSES = 3;
 
-function unwrap<T>(simResult: unknown): T {
-  return (simResult as { value?: T })?.value ?? (simResult as T);
+type Outcome = "processed" | "skipped" | "missing" | "error";
+
+async function tryProcessGoal(
+  contract: TargetSavings.Client,
+  id: bigint,
+): Promise<Outcome> {
+  let goal: {
+    is_complete: boolean;
+    last_deposit_date: bigint;
+    period_seconds: bigint;
+  };
+  try {
+    const tx = await withRetry(`get_target(${id})`, () =>
+      contract.get_target({ target_id: id }),
+    );
+    goal = tx.result.unwrap(); // throws if the goal doesn't exist
+  } catch {
+    return "missing";
+  }
+
+  if (goal.is_complete) return "skipped";
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  if (now < goal.last_deposit_date + goal.period_seconds) return "skipped";
+
+  try {
+    const tx = await withRetry(`process_period(${id})`, () =>
+      contract.process_period({ target_id: id }),
+    );
+    await tx.signAndSend();
+    console.log(`  ✓ Goal ${id} processed`);
+    return "processed";
+  } catch (err) {
+    console.error(
+      `  ✗ Goal ${id} failed:`,
+      err instanceof Error ? err.message : err,
+    );
+    return "error";
+  }
 }
 
 export async function runTargetPeriodic(
   contract: TargetSavings.Client,
-  keeperKeypair: Keypair,
+  _keeperKeypair: Keypair,
 ) {
   console.log("\n[target_periodic] Running…");
 
-  // We don't have a get_all_goals method — the keeper must enumerate
-  // all known goal IDs. For simplicity, we walk a small range starting at 1.
-  // In production this should be replaced with an off-chain index of created
-  // goal IDs (Supabase) or an on-chain `get_all_goals()` reader.
-  const MAX_GOAL_ID = 1000;
   let processed = 0;
   let succeeded = 0;
-  let missed = 0;
   let errors = 0;
 
-  for (let id = 1n; id <= BigInt(MAX_GOAL_ID); id++) {
-    let goal;
-    try {
-      const tx = await contract.get_target({ target_id: id });
-      const sim = await tx.simulate();
-      goal = unwrap<{
-        is_complete: boolean;
-        last_deposit_date: bigint;
-        period_seconds: bigint;
-      }>(sim.result);
-    } catch {
-      // Goal not found — assume we've walked past existing IDs.
-      // Stop after 5 consecutive misses for performance.
-      break;
+  const indexed = await getActiveGoalIds(contract.options.contractId);
+
+  if (indexed) {
+    console.log(`  using goal index (${indexed.length} active)`);
+    for (const id of indexed) {
+      const outcome = await tryProcessGoal(contract, id);
+      if (outcome === "processed") {
+        processed++;
+        succeeded++;
+      } else if (outcome === "error") {
+        processed++;
+        errors++;
+      }
     }
-
-    if (!goal || goal.is_complete) continue;
-
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    const nextDue = goal.last_deposit_date + goal.period_seconds;
-    if (now < nextDue) continue;
-
-    processed++;
-    try {
-      const tx = await contract.process_period({ target_id: id });
-      const signed = await tx.signAuthEntries(makeAuthSigner(keeperKeypair));
-      const result = await signed.send();
-      succeeded++;
-      // Detect missed-period event from transaction logs (contract emits "missed" symbol)
-      const r = result as unknown as { events?: Array<{ topics?: unknown[] }> };
-      const isMissed =
-        r.events?.some((e) => e.topics?.[0] === "missed") ?? false;
-      if (isMissed) missed++;
-      console.log(
-        `  ✓ Goal ${id}${isMissed ? " (missed — insufficient balance/allowance)" : " (deposit succeeded)"}`,
-      );
-    } catch (err) {
-      errors++;
-      console.error(
-        `  ✗ Goal ${id} failed:`,
-        err instanceof Error ? err.message : err,
-      );
+  } else {
+    console.log("  no index — walking goal ids on chain");
+    let consecutiveMisses = 0;
+    for (let id = 1n; id <= MAX_GOAL_ID; id++) {
+      const outcome = await tryProcessGoal(contract, id);
+      if (outcome === "missing") {
+        consecutiveMisses++;
+        if (consecutiveMisses >= MAX_CONSECUTIVE_MISSES) break;
+        continue;
+      }
+      consecutiveMisses = 0;
+      if (outcome === "processed") {
+        processed++;
+        succeeded++;
+      } else if (outcome === "error") {
+        processed++;
+        errors++;
+      }
     }
   }
 
   console.log(
-    `[target_periodic] Done — ${succeeded}/${processed} processed (${missed} missed, ${errors} errors)`,
+    `[target_periodic] Done — ${succeeded}/${processed} processed (${errors} errors)`,
   );
-  return { processed, succeeded, missed, errors };
+  return { processed, succeeded, errors };
 }

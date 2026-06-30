@@ -2,22 +2,25 @@
   "name": "loktin-keeper",
   "version": "1.0.0",
   "description": "Automated bill payment keeper service for Loktin",
-  "main": "src/index.js",
+  "main": "src/index.ts",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "once": "tsx src/index.ts --now"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^14.3.1",
+    "@supabase/supabase-js": "^2.109.0",
     "dotenv": "^17.2.3",
-    "plans": "file:../packages/plans",
-    "target_savings": "file:../packages/target_savings",
     "locked_in": "file:../packages/locked_in",
+    "node-cron": "^4.2.1",
+    "plans": "file:../packages/plans",
     "spend_save": "file:../packages/spend_save",
-    "node-cron": "^4.2.1"
+    "target_savings": "file:../packages/target_savings"
   },
   "devDependencies": {
-    "@types/node-cron": "^3.0.11"
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.19.2"
   }
 }

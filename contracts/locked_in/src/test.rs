@@ -2,8 +2,24 @@
 extern crate std;
 
 use super::*;
+use mock_pool::{MockPool, MockPoolClient};
 use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{token::StellarAssetClient, Env};
+
+const ONE_YEAR: u64 = 31_536_000;
+
+// Register a mock pool (10% APY) on the same token and point the contract at it.
+fn setup_pool<'a>(
+    env: &Env,
+    admin: &Address,
+    token_addr: &Address,
+    client: &LockedInClient,
+) -> MockPoolClient<'a> {
+    let pool_id = env.register(MockPool, (admin.clone(), token_addr.clone(), 1000u32));
+    let pool = MockPoolClient::new(env, &pool_id);
+    client.set_pool(&pool_id);
+    pool
+}
 
 fn setup() -> (Env, Address, Address, Address, LockedInClient<'static>) {
     let env = Env::default();
@@ -87,9 +103,61 @@ fn test_admin_can_change_apy_tier() {
 }
 
 #[test]
-fn test_blend_stubs() {
+fn test_blend_position_zero_when_pool_unset() {
     let (_env, _admin, _user, _token, client) = setup();
-    client.deposit_to_blend(&100_000_000);
-    client.withdraw_from_blend(&50_000_000);
+    // No pool configured yet → position reads 0, deposit errors.
     assert_eq!(client.blend_position(), 0);
+    assert!(client.try_deposit_to_blend(&100_000_000).is_err());
+}
+
+#[test]
+fn test_blend_deposit_accrues_and_withdraws() {
+    let (env, admin, user, token_addr, client) = setup();
+    let _pool = setup_pool(&env, &admin, &token_addr, &client);
+
+    // User locks 100 USDC → contract holds it idle.
+    let amount = 1_000_000_000_i128;
+    client.lock(&user, &amount, &12u32);
+
+    // Keeper sweeps idle USDC into the pool.
+    client.deposit_to_blend(&amount);
+    assert_eq!(client.blend_position(), amount); // 100 USDC, no time elapsed
+
+    // A year passes → 10% yield accrues in the pool.
+    let now = env.ledger().timestamp();
+    env.ledger().set_timestamp(now + ONE_YEAR);
+    assert_eq!(client.blend_position(), 1_100_000_000); // 110 USDC
+
+    // Keeper pulls 40 USDC back into the contract.
+    client.withdraw_from_blend(&400_000_000);
+    assert_eq!(client.blend_position(), 700_000_000); // 110 - 40 = 70 USDC left
+}
+
+#[test]
+fn test_unlock_pays_principal_plus_yield_from_pool() {
+    let (env, admin, user, token_addr, client) = setup();
+    let pool = setup_pool(&env, &admin, &token_addr, &client);
+
+    // Fund the pool's yield reserve so it can pay out more than principal.
+    let token_admin = StellarAssetClient::new(&env, &token_addr);
+    token_admin.mint(&admin, &1_000_000_000); // 100 USDC
+    pool.fund_reserve(&1_000_000_000);
+
+    // User locks 100 USDC for 12 months; keeper sweeps it all into the pool.
+    let amount = 1_000_000_000_i128;
+    let id = client.lock(&user, &amount, &12u32);
+    let lock = client.get_lock(&id);
+    client.deposit_to_blend(&amount); // contract now holds 0 idle USDC
+
+    let token = soroban_sdk::token::TokenClient::new(&env, &token_addr);
+    let user_before = token.balance(&user);
+
+    // Advance to maturity and unlock.
+    env.ledger().set_timestamp(lock.end_date + 1);
+    let payout = client.unlock(&user, &id);
+
+    // Paid principal + the yield projected at lock time, sourced from the pool.
+    assert_eq!(payout, amount + lock.projected_yield);
+    assert_eq!(token.balance(&user) - user_before, amount + lock.projected_yield);
+    assert!(lock.projected_yield > 0);
 }
