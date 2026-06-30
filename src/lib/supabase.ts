@@ -143,3 +143,60 @@ export async function upsertNotificationPrefs(
   if (!supabase) return;
   await supabase.from("notification_preferences").upsert({ user_id, ...prefs });
 }
+
+// ── Target Savings goal index ────────────────────────────────────
+// Keeps `target_goals_cache` in sync so the keeper can find active goals without
+// scanning the chain. Call `registerTargetGoal` right after an on-chain
+// `create_target` succeeds, and `completeTargetGoal` right after a `withdraw`.
+// Both are no-ops if Supabase isn't configured, so they're always safe to call.
+
+export type RegisterGoalInput = {
+  goalId: bigint; // id returned by create_target
+  contractId: string; // the Target Savings contract id (e.g. TargetSavings.networks.testnet.contractId)
+  walletAddress: string; // the goal owner's address
+  name: string;
+  targetAmount?: bigint; // raw stroops (optional, for display)
+  endDate?: bigint; // unix seconds (optional, for display)
+};
+
+/** Register a newly created goal so the keeper picks it up. Returns false on failure. */
+export async function registerTargetGoal(
+  g: RegisterGoalInput,
+): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.from("target_goals_cache").insert({
+    goal_id: Number(g.goalId),
+    contract_id: g.contractId,
+    wallet_address: g.walletAddress,
+    name: g.name,
+    target_amount: g.targetAmount != null ? g.targetAmount.toString() : null,
+    end_date:
+      g.endDate != null
+        ? new Date(Number(g.endDate) * 1000).toISOString()
+        : null,
+    is_complete: false,
+  });
+  if (error) {
+    console.error("registerTargetGoal:", error);
+    return false;
+  }
+  return true;
+}
+
+/** Mark a goal complete so the keeper stops processing it. Returns false on failure. */
+export async function completeTargetGoal(
+  goalId: bigint,
+  contractId: string,
+): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from("target_goals_cache")
+    .update({ is_complete: true, updated_at: new Date().toISOString() })
+    .eq("goal_id", Number(goalId))
+    .eq("contract_id", contractId);
+  if (error) {
+    console.error("completeTargetGoal:", error);
+    return false;
+  }
+  return true;
+}

@@ -196,6 +196,7 @@ export default function Targets() {
               <UsdcAllowance
                 spenderContract={TARGET_SAVINGS_CONTRACT_ID}
                 requiredAmount={pendingCreate.targetAmount}
+                endDate={pendingCreate.endDate}
                 onReady={() => void finishCreate()}
                 label="Authorize the Target Savings contract to debit your wallet for periodic deposits."
               />
