@@ -23,4 +23,5 @@ pub enum DataKey {
     Lock(u64),
     UserLocks(Address),
     ApyTiers,
+    Pool, // Address of the (mock) Blend pool, set post-deploy via set_pool
 }

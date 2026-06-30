@@ -17,6 +17,7 @@ export default tseslint.config(
     "keeper",
     "src/contracts/*",
     "!src/contracts/util.ts",
+    "!src/contracts/clientHelpers.ts",
   ]),
   {
     extends: [

@@ -101,12 +101,12 @@ client = false
 
 # Target Savings — goal-based vaults with periodic deposits
 [staging.contracts.target_savings]
-id = "CAXWDBP4VNPJFOMO24T2IKH2TVP365POSV6TOY2WQ4GKV6UOGQDNGTGA"
+id = "CBLZMVSR5NHSUN5A3J5Z433ZVR3VW7EDLX6T2PDVAVKVYDBIXFDRUKBB"
 client = true
 
 # Locked In — fixed-term USDC locks with tiered APY
 [staging.contracts.locked_in]
-id = "CBN42TMPMZ2QTHOH2QFUK3AXAZ4I266EQWT62JF6CAX7YO5BXT2CSC2C"
+id = "CBZNRI5PGBV4AQG6PLKCF6XEKLECKHDAXYELLOQDG26OG2UML74GVVEU"
 client = true
 
 # Spend & Save — auto-savings with day-28 withdrawals

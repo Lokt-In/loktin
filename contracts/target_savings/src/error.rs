@@ -15,4 +15,5 @@ pub enum Error {
     InsufficientUserBalance = 16,
     InsufficientUserAllowance = 17,
     NotGoalOwner = 18,
+    PoolNotSet = 19,
 }
