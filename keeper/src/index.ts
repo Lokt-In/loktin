@@ -5,8 +5,28 @@ import {
   initializeTargetSavings,
 } from "./payment/client.js";
 import { startScheduler, runAllOnce } from "./core/scheduler.js";
+import { initGoalIndex } from "./data/goalIndex.js";
 
 dotenv.config();
+
+// Enable the off-chain goal index if Supabase creds are present (else the keeper
+// falls back to walking goal ids on chain).
+const goalIndexOn = initGoalIndex();
+
+// Never let a single transient network error (e.g. an RPC ECONNRESET in a
+// floating promise) take down the keeper. Log and keep going.
+process.on("unhandledRejection", (reason) => {
+  console.error(
+    "⚠ unhandledRejection:",
+    reason instanceof Error ? reason.message : reason,
+  );
+});
+process.on("uncaughtException", (err) => {
+  console.error(
+    "⚠ uncaughtException:",
+    err instanceof Error ? err.message : err,
+  );
+});
 
 // ── Validate env ──────────────────────────────────────────────────
 const requiredEnvVars = [
@@ -71,6 +91,51 @@ const schedules = {
 };
 
 // ── Run ───────────────────────────────────────────────────────────
+// Idle-USDC sweep targets: any savings contract whose id is configured.
+const sweepTargets = [
+  { name: "locked_in", contractId: process.env.LOCKED_IN_CONTRACT_ID },
+  {
+    name: "target_savings",
+    contractId: process.env.TARGET_SAVINGS_CONTRACT_ID,
+  },
+].filter((t): t is { name: string; contractId: string } =>
+  Boolean(t.contractId),
+);
+
+const blendSweep =
+  process.env.USDC_CONTRACT_ID && sweepTargets.length > 0
+    ? {
+        targets: sweepTargets,
+        usdcSac: process.env.USDC_CONTRACT_ID,
+        rpcUrl: process.env.RPC_URL!,
+        networkPassphrase: process.env.NETWORK_PASSPHRASE!,
+        adminKeypair,
+        minSweep: BigInt(process.env.BLEND_SWEEP_MIN ?? "10000000"),
+      }
+    : undefined;
+
+// Reserve top-up keeps the mock pool able to pay yield (testnet demo safety net).
+const reserveTopUp =
+  process.env.MOCK_POOL_CONTRACT_ID &&
+  process.env.USDC_CONTRACT_ID &&
+  sweepTargets.length > 0
+    ? {
+        poolId: process.env.MOCK_POOL_CONTRACT_ID,
+        supplierContractIds: sweepTargets.map((t) => t.contractId),
+        usdcSac: process.env.USDC_CONTRACT_ID,
+        rpcUrl: process.env.RPC_URL!,
+        networkPassphrase: process.env.NETWORK_PASSPHRASE!,
+        adminKeypair,
+        reserveMin: BigInt(process.env.RESERVE_MIN ?? "10000000"), // 1 USDC
+        reserveTarget: BigInt(process.env.RESERVE_TARGET ?? "50000000"), // 5 USDC
+        adminKeep: BigInt(process.env.RESERVE_ADMIN_KEEP ?? "20000000"), // keep ≥2 USDC
+      }
+    : undefined;
+
+console.log(
+  `  Goal index:      ${goalIndexOn ? "Supabase" : "off (chain walk)"}`,
+);
+
 const cfg = {
   loktinContract,
   // If target savings isn't configured, the scheduler will still run other jobs.
@@ -78,6 +143,8 @@ const cfg = {
   // without a configured contract.
   targetSavingsContract: targetSavingsContract!,
   adminKeypair,
+  blendSweep,
+  reserveTopUp,
   schedules,
 };
 
