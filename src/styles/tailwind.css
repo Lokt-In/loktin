@@ -1,0 +1,38 @@
+/*
+ * Tailwind v4 entry. Preflight is intentionally omitted (theme + utilities
+ * only) — the app already ships its own reset in base.css, and skipping
+ * preflight avoids restyling the existing (non-Tailwind) dashboard mid-redesign.
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* Redesign design system (landing-first): cream / navy / orange, Fraunces +
+   IBM Plex Sans. Exposed as both utilities (bg-cream, text-navy, font-heading…)
+   and CSS vars (var(--color-navy)…). */
+@theme {
+  --color-cream: #ede6d6;
+  --color-navy: #1b2a41;
+  --color-orange: #a13d2c;
+  --color-gold: #b8863b;
+  --color-tan: #c3b79a;
+  /* dark theme */
+  --color-ink: #0a0a0c;
+  --color-cyan: #22d3ee;
+  --color-surface: #0a0c16;
+  --color-muted: #676d84;
+  --color-subtle: #9aa0b4;
+  --font-heading: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+
+  --animate-wordmark-shadow: wordmark-shadow 4s ease-in-out infinite;
+  @keyframes wordmark-shadow {
+    0%,
+    100% {
+      text-shadow: 6px 0 0 #ffffff;
+    }
+    50% {
+      text-shadow: 14px 0 0 #ffffff;
+    }
+  }
+}
