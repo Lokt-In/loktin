@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { connectWallet } from "../../util/wallet";
 import { useWallet } from "../../hooks/useWallet";
@@ -17,6 +18,35 @@ const STATS = [
 export default function HeroSection() {
   const { address } = useWallet();
   const navigate = useNavigate();
+  const sectionRef = useRef<HTMLElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // The ripple is an animated displacement filter: it repaints the grid every
+  // frame for as long as its SMIL clock runs, even when the hero is scrolled
+  // past. Freeze the clock whenever the hero is off screen — and outright, if
+  // the user prefers reduced motion (base.css already drops the filter there).
+  useEffect(() => {
+    const svg = svgRef.current;
+    const section = sectionRef.current;
+    if (!svg || !section) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      svg.pauseAnimations();
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) svg.unpauseAnimations();
+        else svg.pauseAnimations();
+      },
+      { threshold: 0 },
+    );
+    observer.observe(section);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   const handleConnect = () => {
     if (address) void navigate("/dashboard");
@@ -24,8 +54,12 @@ export default function HeroSection() {
   };
 
   return (
-    <section className="relative overflow-hidden">
-      <svg aria-hidden className="pointer-events-none absolute h-0 w-0">
+    <section ref={sectionRef} className="relative overflow-hidden">
+      <svg
+        ref={svgRef}
+        aria-hidden
+        className="pointer-events-none absolute h-0 w-0"
+      >
         <filter id="grid-ripple" x="-20%" y="-20%" width="140%" height="140%">
           <feTurbulence
             type="fractalNoise"
