@@ -119,7 +119,7 @@ export default function HeroSection() {
           </div>
         </div>
 
-        <dl className="mx-auto h-[192.57000732421875px] mt-16 grid max-w-[900px] grid-cols-3 divide-x divide-[#ffffff14]/30 rounded-2xl border border-[#ffffff14] bg-surface">
+        <dl className="mx-auto mt-16 grid min-h-[193px] max-w-[900px] grid-cols-3 divide-x divide-[#ffffff14]/30 rounded-2xl border border-[#ffffff14] bg-surface">
           {STATS.map((s) => (
             <div
               key={s.label}

@@ -7,16 +7,10 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
-/* Redesign design system (landing-first): cream / navy / orange, Fraunces +
-   IBM Plex Sans. Exposed as both utilities (bg-cream, text-navy, font-heading…)
-   and CSS vars (var(--color-navy)…). */
+/* Redesign design system (landing-first): dark ink / cyan, Fraunces + IBM Plex
+   Sans. Exposed as both utilities (bg-ink, text-cyan, font-heading…) and CSS
+   vars (var(--color-cyan)…). */
 @theme {
-  --color-cream: #ede6d6;
-  --color-navy: #1b2a41;
-  --color-orange: #a13d2c;
-  --color-gold: #b8863b;
-  --color-tan: #c3b79a;
-  /* dark theme */
   --color-ink: #0a0a0c;
   --color-cyan: #22d3ee;
   --color-surface: #0a0c16;
