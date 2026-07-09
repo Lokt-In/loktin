@@ -82,7 +82,7 @@ export default function PrimitivesSection() {
   return (
     <section className="relative overflow-hidden">
       <img
-        src="/landing/elements/Background%20pattern.png"
+        src="/landing/elements/background-pattern.png"
         alt=""
         aria-hidden
         className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-40 select-none"

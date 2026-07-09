@@ -6,7 +6,6 @@ import FaqSection from "../components/landing/FaqSection";
 import CtaSection from "../components/landing/CtaSection";
 import Footer from "../components/landing/Footer";
 import Reveal from "../components/landing/Reveal";
-// import ProblemSection from "../components/landing/ProblemSection"; // light-themed — re-enable after its dark redesign
 
 /**
  * Landing page (redesign, Tailwind, dark theme). `.lk-theme` opts this subtree
