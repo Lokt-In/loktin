@@ -12,12 +12,15 @@ import SimulatedTimeBanner from "../../features/locked/components/SimulatedTimeB
 const FILTERS = ["All", "Active", "Matured"] as const;
 type Filter = (typeof FILTERS)[number];
 
+const PAGE_SIZE = 5;
+
 export default function Locked() {
   const { address } = useWallet();
   const navigate = useNavigate();
   const { locks, loading, submitting, lastError, unlock } = useLocks();
   const { refresh: refreshBalance } = useUsdcBalance();
   const [filter, setFilter] = useState<Filter>("All");
+  const [page, setPage] = useState(1);
   const [unlockTarget, setUnlockTarget] = useState<Lock | null>(null);
 
   // Recompute maturity on a timer: a lock can cross its end_date while the page
@@ -40,6 +43,20 @@ export default function Locked() {
     const want = filter === "Active" ? "locked" : "matured";
     return locks.filter((l) => lockStatus(l, nowSecs) === want);
   }, [locks, filter, nowSecs]);
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+
+  // The visible set can shrink under the current page — unlocking the last
+  // matured lock, or a lock maturing out of the Active filter — which would
+  // otherwise strand the user on an empty page.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const paged = useMemo(
+    () => visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [visible, page],
+  );
 
   if (!address) return null;
 
@@ -101,12 +118,15 @@ export default function Locked() {
               <button
                 key={f}
                 type="button"
-                onClick={() => setFilter(f)}
+                onClick={() => {
+                  setFilter(f);
+                  setPage(1);
+                }}
                 aria-pressed={filter === f}
                 className={`shrink-0 rounded-full border px-6 py-2.5 font-body text-[14px] transition-colors ${
                   filter === f
                     ? "border-cyan/40 bg-cyan/10 text-cyan"
-                    : "border-[#ffffff14] bg-transparent text-muted hover:text-white"
+                    : "border-[#ffffff14] bg-[#101116] text-muted hover:text-white"
                 }`}
               >
                 {f}
@@ -126,16 +146,24 @@ export default function Locked() {
             No {filter.toLowerCase()} locks.
           </p>
         ) : (
-          <ul className="mt-8 flex flex-col gap-4">
-            {visible.map((l) => (
-              <LockRow
-                key={l.id.toString()}
-                lock={l}
-                nowSecs={nowSecs}
-                onUnlock={setUnlockTarget}
-              />
-            ))}
-          </ul>
+          <>
+            <ul className="mt-8 flex flex-col gap-4">
+              {paged.map((l) => (
+                <LockRow
+                  key={l.id.toString()}
+                  lock={l}
+                  nowSecs={nowSecs}
+                  onUnlock={setUnlockTarget}
+                />
+              ))}
+            </ul>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={visible.length}
+              onChange={setPage}
+            />
+          </>
         )}
       </div>
 
@@ -149,6 +177,99 @@ export default function Locked() {
         />
       )}
     </div>
+  );
+}
+
+interface PaginationProps {
+  page: number;
+  totalPages: number;
+  total: number;
+  onChange: (page: number) => void;
+}
+
+function Pagination({ page, totalPages, total, onChange }: PaginationProps) {
+  if (totalPages <= 1) return null;
+
+  const first = (page - 1) * PAGE_SIZE + 1;
+  const last = Math.min(page * PAGE_SIZE, total);
+  const arrow =
+    "grid h-9 w-9 place-items-center rounded-lg border border-[#ffffff14] bg-[#101116] text-subtle transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-subtle";
+
+  return (
+    <nav
+      aria-label="Pagination"
+      className="mt-8 flex flex-col items-center justify-between gap-4 sm:flex-row"
+    >
+      <p className="font-body text-[13px] text-muted">
+        Showing {first}–{last} of {total}
+      </p>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(page - 1)}
+          disabled={page === 1}
+          aria-label="Previous page"
+          className={arrow}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden
+          >
+            <path
+              d="m14 6-6 6 6 6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            aria-current={n === page ? "page" : undefined}
+            className={`h-9 min-w-9 rounded-lg border px-3 font-body text-[13.5px] font-semibold transition-colors ${
+              n === page
+                ? "border-cyan/40 bg-cyan/10 text-cyan"
+                : "border-[#ffffff14] bg-[#101116] text-muted hover:text-white"
+            }`}
+          >
+            {n}
+          </button>
+        ))}
+
+        <button
+          type="button"
+          onClick={() => onChange(page + 1)}
+          disabled={page === totalPages}
+          aria-label="Next page"
+          className={arrow}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden
+          >
+            <path
+              d="m10 6 6 6-6 6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+    </nav>
   );
 }
 
