@@ -12,12 +12,12 @@ export default function StepIndicator({ current }: { current: number }) {
             {i > 0 && (
               <span
                 aria-hidden
-                className={`mx-4 block h-px w-[60px] ${
+                className={`mx-2 block h-px w-6 sm:mx-4 sm:w-[60px] ${
                   step <= current ? "bg-cyan" : "bg-[#ffffff24]"
                 }`}
               />
             )}
-            <span className="flex items-center gap-2.5">
+            <span className="flex items-center gap-1.5 sm:gap-2.5">
               <span
                 className={`grid h-7 w-7 place-items-center rounded-full border font-body text-[13px] font-semibold ${
                   step === current
@@ -30,7 +30,7 @@ export default function StepIndicator({ current }: { current: number }) {
                 {step}
               </span>
               <span
-                className={`font-body text-[15px] font-semibold ${
+                className={`font-body text-[13px] font-semibold whitespace-nowrap sm:text-[15px] ${
                   reached ? "text-white" : "text-muted"
                 }`}
               >

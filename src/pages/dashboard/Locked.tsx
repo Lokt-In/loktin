@@ -68,10 +68,10 @@ export default function Locked() {
         />
       </div>
 
-      <div className="relative mx-auto max-w-[1280px] px-6 py-14 md:px-10">
+      <div className="relative mx-auto max-w-[1280px] px-4 py-10 sm:px-6 md:px-10 md:py-14">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-[640px]">
-            <h1 className="font-heading text-[34px] leading-tight font-bold text-[#eef0f7]">
+            <h1 className="font-heading text-[28px] leading-tight font-bold text-[#eef0f7] sm:text-[34px]">
               Locked In
             </h1>
             <p className="mt-3 font-body text-[14.5px] leading-relaxed text-muted">
@@ -83,7 +83,7 @@ export default function Locked() {
           <DashButton
             variant="primary"
             onClick={() => void navigate("/dashboard/locked/new")}
-            className="shrink-0 px-6 py-3"
+            className="w-full shrink-0 px-6 py-3 sm:w-auto"
           >
             Create Locked Savings
           </DashButton>
@@ -96,14 +96,14 @@ export default function Locked() {
         )}
 
         {locks.length > 0 && (
-          <div className="mt-10 flex items-center gap-3">
+          <div className="-mx-4 mt-10 flex items-center gap-3 overflow-x-auto px-4 sm:mx-0 sm:px-0">
             {FILTERS.map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => setFilter(f)}
                 aria-pressed={filter === f}
-                className={`rounded-full border px-6 py-2.5 font-body text-[14px] transition-colors ${
+                className={`shrink-0 rounded-full border px-6 py-2.5 font-body text-[14px] transition-colors ${
                   filter === f
                     ? "border-cyan/40 bg-cyan/10 text-cyan"
                     : "border-[#ffffff14] bg-transparent text-muted hover:text-white"

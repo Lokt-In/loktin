@@ -26,8 +26,8 @@ export default function WalletPill() {
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-full border border-[#ffffff14] bg-[#ffffff0a] py-2 pr-5 pl-5">
-      <span className="font-mono text-[13px] text-white/80">
+    <div className="flex items-center gap-2 rounded-full border border-[#ffffff44] bg-[#ffffff0a] px-3 py-2 sm:gap-3 sm:px-5">
+      <span className="font-mono text-[12px] text-white/80 sm:text-[13px]">
         {truncate(address)}
       </span>
       <button
@@ -79,8 +79,8 @@ export default function WalletPill() {
           </svg>
         )}
       </button>
-      <span className="font-mono text-[13px] font-semibold text-cyan">
-        {loading ? "—" : formatted} <span className="text-white/50">USDC</span>
+      <span className="font-mono text-[12px] font-semibold whitespace-nowrap text-cyan sm:text-[13px]">
+        {loading ? "—" : formatted} <span>USDC</span>
       </span>
     </div>
   );

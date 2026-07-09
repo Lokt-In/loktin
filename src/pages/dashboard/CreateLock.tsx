@@ -91,8 +91,8 @@ export default function CreateLock() {
   const needsApproval = !allowance.loading && !allowance.sufficient;
 
   return (
-    <div className="mx-auto max-w-[1280px] px-6 py-10 md:px-10">
-      <div className="flex items-center gap-4">
+    <div className="mx-auto max-w-[1280px] px-4 py-8 sm:px-6 md:px-10 md:py-10">
+      <div className="flex items-center gap-3 sm:gap-4">
         <button
           type="button"
           onClick={() => void navigate("/dashboard/locked")}
@@ -115,7 +115,10 @@ export default function CreateLock() {
             />
           </svg>
         </button>
-        <nav className="font-mono text-[15px]" aria-label="Breadcrumb">
+        <nav
+          className="min-w-0 font-mono text-[13.5px] sm:text-[15px]"
+          aria-label="Breadcrumb"
+        >
           <button
             type="button"
             onClick={() => void navigate("/dashboard/locked")}
@@ -123,7 +126,7 @@ export default function CreateLock() {
           >
             Locked In
           </button>
-          <span className="mx-2 text-muted">›</span>
+          <span className="mx-1.5 text-muted sm:mx-2">›</span>
           <span className="text-white">Create Locked Savings</span>
         </nav>
       </div>
@@ -132,7 +135,13 @@ export default function CreateLock() {
         <StepIndicator current={step} />
       </div>
 
-      <div className="mx-auto mt-20 max-w-[680px] rounded-2xl border border-[#ffffff14] bg-[#ffffff05] p-9">
+      <div
+        className="mx-auto mt-12 max-w-[680px] rounded-2xl border border-[#ffffff14] p-6 sm:p-9 md:mt-20"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)",
+        }}
+      >
         {step === 1 && (
           <>
             <h1 className="font-heading text-[25px] font-bold text-[#eef0f7]">
@@ -149,7 +158,7 @@ export default function CreateLock() {
             >
               Amount to lock
             </label>
-            <div className="mt-3 flex items-center rounded-xl border border-[#ffffff14] bg-surface px-5 py-5">
+            <div className="mt-3 flex min-h-[74px] items-center rounded-xl border border-[#ffffff14] bg-surface px-5 py-4">
               <input
                 id="amount"
                 inputMode="decimal"
@@ -159,14 +168,18 @@ export default function CreateLock() {
                   const v = e.target.value;
                   if (/^\d*\.?\d*$/.test(v)) setAmountInput(v);
                 }}
-                className="w-full bg-transparent font-mono text-[17px] text-white outline-none placeholder:text-muted"
+                // Preflight is off, so the field keeps its UA border/background
+                // and it renders as a second box inside the wrapper's chrome.
+                // Reset on the element, not globally: a blanket `appearance:
+                // none` would strip the native track off SpendSave's range input.
+                className="w-full min-w-0 appearance-none border-0 bg-transparent font-mono text-[17px] text-white outline-none placeholder:text-muted"
               />
               <span className="ml-4 font-mono text-[15px] text-subtle">
                 USDC
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-4 gap-3">
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {PERCENTS.map((p) => (
                 <button
                   key={p.label}
@@ -305,10 +318,10 @@ export default function CreateLock() {
                 label="Term"
                 value={`${months} month${months === 1 ? "" : "s"}`}
               />
-              <div className="flex items-center justify-between py-4">
+              <div className="flex items-center justify-between gap-6 py-4">
                 <dt className="font-body text-[14.5px] text-muted">APY Tier</dt>
-                <dd>
-                  <span className="rounded-full border border-[#34E0A16b] bg-[#34E0A114] px-3 py-1.5 font-body text-[13.5px] font-semibold text-[#34E0A1]">
+                <dd className="shrink-0">
+                  <span className="rounded-full border border-[#34E0A16b] bg-[#34E0A114] px-3 py-1.5 font-body text-[13.5px] font-semibold whitespace-nowrap text-[#34E0A1]">
                     {(apyBps / 100).toFixed(apyBps % 100 === 0 ? 0 : 1)}% APY
                   </span>
                 </dd>
@@ -318,11 +331,11 @@ export default function CreateLock() {
                 label="Projected yield"
                 value={`+${formatUsdc(yieldStroops)} USDC`}
               />
-              <div className="flex items-center justify-between py-4">
+              <div className="flex items-center justify-between gap-6 py-4">
                 <dt className="font-body text-[14.5px] text-muted">
                   You receive at maturity
                 </dt>
-                <dd className="font-body text-[15px] font-bold text-cyan">
+                <dd className="shrink-0 text-right font-body text-[15px] font-bold text-cyan">
                   {formatUsdc(amount + yieldStroops)} USDC
                 </dd>
               </div>
@@ -374,9 +387,9 @@ export default function CreateLock() {
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-4">
+    <div className="flex items-center justify-between gap-6 py-4">
       <dt className="font-body text-[14.5px] text-muted">{label}</dt>
-      <dd className="font-body text-[15px] font-bold text-[#eef0f7]">
+      <dd className="shrink-0 text-right font-body text-[15px] font-bold text-[#eef0f7]">
         {value}
       </dd>
     </div>

@@ -50,7 +50,7 @@ export default function DashModal({
         aria-labelledby={labelledBy}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[560px] rounded-2xl border border-[#ffffff14] bg-surface p-8 outline-none"
+        className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-2xl border border-[#ffffff14] bg-surface p-6 outline-none sm:p-8"
       >
         {children}
       </div>

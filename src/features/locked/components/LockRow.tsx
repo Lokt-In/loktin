@@ -83,15 +83,19 @@ export default function LockRow({ lock, nowSecs, onUnlock }: Props) {
 
       <div className="shrink-0">
         {status === "matured" ? (
-          <DashButton variant="primary" onClick={() => onUnlock(lock)}>
+          <DashButton
+            variant="primary"
+            onClick={() => onUnlock(lock)}
+            className="w-full sm:w-auto"
+          >
             Unlock Now
           </DashButton>
         ) : status === "locked" ? (
-          <DashButton variant="muted" disabled>
+          <DashButton variant="muted" disabled className="w-full sm:w-auto">
             Locked · {timeLeftLabel(lock, nowSecs)}
           </DashButton>
         ) : (
-          <DashButton variant="muted" disabled>
+          <DashButton variant="muted" disabled className="w-full sm:w-auto">
             Withdrawn
           </DashButton>
         )}
