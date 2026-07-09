@@ -59,13 +59,14 @@ export default function Locked() {
       {/* Faint grid wash behind the content, per the design. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.045]"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
-          backgroundSize: "160px 160px",
-        }}
-      />
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+        <img
+          src="/dashboard/element/girdline.png"
+          alt=""
+          className="absolute top-0 left-1/2 w-[1283px] max-w-none -translate-x-1/2 opacity-30 select-none"
+        />
+      </div>
 
       <div className="relative mx-auto max-w-[1280px] px-6 py-14 md:px-10">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
@@ -154,51 +155,16 @@ export default function Locked() {
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center py-32 text-center">
-      <svg
-        width="150"
-        height="110"
-        viewBox="0 0 150 110"
-        fill="none"
+      <img
+        src="/dashboard/element/empty-state.svg"
+        alt=""
         aria-hidden
-        className="opacity-80"
-      >
-        <rect
-          x="18"
-          y="52"
-          width="114"
-          height="34"
-          rx="4"
-          fill="#d7dae5"
-          stroke="#b9bfd0"
-          strokeWidth="1.5"
-        />
-        <path
-          d="M18 56h114L75 82 18 56z"
-          fill="#eef0f7"
-          stroke="#b9bfd0"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <rect
-          x="60"
-          y="20"
-          width="30"
-          height="24"
-          rx="3"
-          fill="#eef0f7"
-          stroke="#b9bfd0"
-          strokeWidth="1.5"
-        />
-        <path
-          d="M67 20v-5a8 8 0 0 1 16 0v5"
-          stroke="#b9bfd0"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-        <circle cx="75" cy="31" r="2.5" fill="#b9bfd0" />
-      </svg>
+        width={150}
+        height={150}
+        className="select-none"
+      />
 
-      <h2 className="mt-8 font-heading text-[27px] font-bold text-[#eef0f7]">
+      <h2 className="mt-6 font-heading text-[27px] font-bold text-[#eef0f7]">
         You currently have zero locked funds
       </h2>
       <p className="mt-3 font-body text-[14.5px] text-muted">
