@@ -1,9 +1,5 @@
 import type { TargetGoal } from "../hooks/useTargets";
-import {
-  forfeitAmount,
-  isEarlyWithdrawal,
-  withdrawalPayout,
-} from "../lib/targetMath";
+import { forfeitAmount, isEarlyWithdrawal } from "../lib/targetMath";
 import { formatUsdcAdaptive, formatDate } from "../../../shared/lib/money";
 import DashModal from "../../../shared/dash/DashModal";
 import DashButton from "../../../shared/dash/DashButton";
@@ -43,11 +39,20 @@ export default function WithdrawModal({
   onConfirm,
   onCancel,
 }: Props) {
-  const early = isEarlyWithdrawal(goal, realNowSecs);
-  const forfeit = forfeitAmount(goal, realNowSecs);
   const loadingYield = goalYield === null;
   const earned = goalYield ?? 0n;
-  const receive = withdrawalPayout(goal, earned, realNowSecs);
+
+  // What the *real* contract would charge right now. Always computed, because
+  // it's what the simulated-time notice has to disclose.
+  const realForfeit = forfeitAmount(goal, realNowSecs);
+
+  // Under simulation the row previews the matured state, so the breakdown has
+  // to match it: this is what you'd receive *at* maturity, with no forfeit.
+  // Confirm is disabled in that state, so nothing can be withdrawn against
+  // these figures — and the notice below still spells out today's real cost.
+  const early = !simulatedOnly && isEarlyWithdrawal(goal, realNowSecs);
+  const forfeit = early ? realForfeit : 0n;
+  const receive = goal.deposited - forfeit + earned;
 
   return (
     <DashModal open onClose={onCancel} labelledBy="withdraw-title">
@@ -58,9 +63,11 @@ export default function WithdrawModal({
         {early ? "Withdraw early" : "Withdraw"}
       </h2>
       <p className="mt-2 text-center font-body text-[14.5px] text-muted">
-        {early
-          ? "This goal hasn't reached its deadline. Here's your payout breakdown."
-          : "This goal has reached its deadline. Here's your payout breakdown."}
+        {simulatedOnly
+          ? "Preview at maturity, under the simulated clock."
+          : early
+            ? "This goal hasn't reached its deadline. Here's your payout breakdown."
+            : "This goal has reached its deadline. Here's your payout breakdown."}
       </p>
 
       <dl className="mt-7 rounded-xl border border-[#ffffff14] bg-[#ffffff0a] px-6 py-2">
@@ -103,9 +110,10 @@ export default function WithdrawModal({
 
       {simulatedOnly && (
         <p className="mt-4 rounded-lg border border-cyan/25 bg-cyan/[0.06] px-4 py-3 font-body text-[13px] text-subtle">
-          This goal only reads as matured because the display clock was
-          fast-forwarded. The contract goes by the ledger, so withdrawing now
-          would still forfeit 1%. It matures on {formatDate(goal.end_date)}.
+          These are the figures at maturity, on {formatDate(goal.end_date)}. The
+          contract goes by the ledger, not the simulated clock — withdrawing
+          today would forfeit {formatUsdcAdaptive(realForfeit)} USDC (1%). Reset
+          the clock to do that deliberately.
         </p>
       )}
 
