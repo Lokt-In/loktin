@@ -12,11 +12,17 @@ interface Props {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  /** Wallet balance in stroops; drives the percent shortcuts. */
+  /** Wallet balance in stroops. Used for the caption, and as the default percent base. */
   balance?: bigint;
   /** Pre-formatted balance for the caption. Omit to hide the caption. */
   balanceFormatted?: string;
-  /** 25/50/75/Max shortcuts. Requires `balance`. */
+  /**
+   * What 25/50/75/Max are percentages *of*. Defaults to `balance`. Top Up passes
+   * the goal's remaining amount instead, so Max fills the goal rather than
+   * draining the wallet.
+   */
+  percentBase?: bigint;
+  /** 25/50/75/Max shortcuts. Requires a non-zero percent base. */
   showPercents?: boolean;
   error?: string | null;
   placeholder?: string;
@@ -38,16 +44,31 @@ export default function AmountField({
   onChange,
   balance,
   balanceFormatted,
+  percentBase,
   showPercents = false,
   error,
   placeholder = "0.00",
 }: Props) {
+  const base = percentBase ?? balance ?? 0n;
+
+  /**
+   * Exact stroop value as a plain decimal (no separators — `parseUsdc` would
+   * reject them). Emitting the exact amount matters both ways: rounding up would
+   * let Max exceed the wallet balance and fail the transfer, while truncating to
+   * 2dp would collapse a sub-cent remainder to an unsubmittable 0.00.
+   */
+  const toPlain = (stroops: bigint) => {
+    const whole = stroops / STROOPS;
+    const frac = (stroops % STROOPS)
+      .toString()
+      .padStart(7, "0")
+      .replace(/0+$/, "");
+    return frac.length > 0 ? `${whole}.${frac}` : `${whole}.00`;
+  };
+
   const setPercent = (frac: bigint) => {
-    if (balance === undefined) return;
-    const raw = (balance * frac) / 100n;
-    // Trim to 2dp so the field shows what the user sees everywhere else.
-    const trimmed = (raw / (STROOPS / 100n)) * (STROOPS / 100n);
-    onChange((Number(trimmed) / Number(STROOPS)).toFixed(2));
+    if (base <= 0n) return;
+    onChange(toPlain((base * frac) / 100n));
   };
 
   return (
@@ -79,7 +100,7 @@ export default function AmountField({
             <button
               key={p.label}
               type="button"
-              disabled={!balance}
+              disabled={base <= 0n}
               onClick={() => setPercent(p.frac)}
               className="rounded-lg border border-[#ffffff14] bg-[#ffffff08] py-3 font-body text-[14px] font-semibold text-subtle transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >

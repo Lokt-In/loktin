@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { TargetGoal } from "../hooks/useTargets";
-import { parseUsdc } from "../../../shared/lib/money";
+import { parseUsdc, formatUsdcAdaptive } from "../../../shared/lib/money";
 import DashModal from "../../../shared/dash/DashModal";
 import DashButton from "../../../shared/dash/DashButton";
 import AmountField from "../../../shared/dash/AmountField";
@@ -29,6 +29,14 @@ export default function TopUpModal({
   const overBalance = amount > balance;
   const valid = amount > 0n && !overBalance;
 
+  // Percent shortcuts are of the goal's remaining amount, not the wallet: "Max"
+  // should finish the goal, not drain the wallet. The wallet still bounds what
+  // can actually be submitted, hence the separate over-balance check.
+  const remaining =
+    goal.target_amount > goal.deposited
+      ? goal.target_amount - goal.deposited
+      : 0n;
+
   return (
     <DashModal open onClose={onCancel} labelledBy="topup-title">
       <h2
@@ -49,11 +57,18 @@ export default function TopUpModal({
           onChange={setInput}
           balance={balance}
           balanceFormatted={balanceFormatted}
+          percentBase={remaining}
           showPercents
           error={
             overBalance ? "That's more than your wallet holds." : undefined
           }
         />
+        <div className="mt-2 flex items-center justify-between font-body text-[14px]">
+          <span className="font-semibold text-muted">Remaining to goal</span>
+          <span className="font-semibold text-[#eef0f7]">
+            {formatUsdcAdaptive(remaining)} USDC
+          </span>
+        </div>
       </div>
 
       {error && (

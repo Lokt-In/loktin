@@ -1,6 +1,10 @@
 import type { Lock } from "../hooks/useLocks";
 import { lockMonths, lockStatus, timeLeftLabel } from "../lib/lockMath";
-import { formatUsdc, formatDateShort } from "../../../shared/lib/money";
+import {
+  formatUsdc,
+  formatUsdcAdaptive,
+  formatDateShort,
+} from "../../../shared/lib/money";
 import DashButton from "../../../shared/dash/DashButton";
 
 const STATUS_STYLES = {
@@ -101,7 +105,7 @@ export default function LockRow({
           </span>
           <span>
             <span className="font-semibold text-subtle">Projected yield</span> +
-            {formatUsdc(lock.projected_yield, 2)} USDC
+            {formatUsdcAdaptive(lock.projected_yield)} USDC
           </span>
           <span>
             Unlocks on{" "}

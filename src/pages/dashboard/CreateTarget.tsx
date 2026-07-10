@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "../../hooks/useWallet";
 import { useUsdcBalance } from "../../hooks/useUsdcBalance";
@@ -42,6 +42,7 @@ export default function CreateTarget() {
   const [deadline, setDeadline] = useState("");
   const [freqIndex, setFreqIndex] = useState<number | null>(null);
   const [created, setCreated] = useState(false);
+  const deadlineRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!address) void navigate("/");
@@ -189,15 +190,69 @@ export default function CreateTarget() {
             >
               Deadline
             </label>
-            <div className="mt-3 flex min-h-[74px] items-center rounded-xl border border-[#ffffff14] bg-surface px-5 py-4">
+            <div className="mt-3 flex min-h-[74px] items-center gap-4 rounded-xl border border-[#ffffff14] bg-surface px-5 py-4">
               <input
+                ref={deadlineRef}
                 id="deadline"
                 type="date"
                 min={minDate}
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
-                className="w-full min-w-0 appearance-none border-0 bg-transparent font-mono text-[17px] text-white outline-none placeholder:text-muted"
+                // Hide the UA's own picker indicator; the design's calendar-02
+                // icon below opens the picker instead.
+                className="w-full min-w-0 appearance-none border-0 bg-transparent font-mono text-[17px] text-white outline-none [&::-webkit-calendar-picker-indicator]:hidden"
               />
+              <button
+                type="button"
+                aria-label="Open date picker"
+                onClick={() => {
+                  const el = deadlineRef.current;
+                  // showPicker isn't in every browser; focusing still lets the
+                  // user type or open the native picker themselves.
+                  if (el?.showPicker) el.showPicker();
+                  else el?.focus();
+                }}
+                className="shrink-0 text-muted transition-colors hover:text-white"
+              >
+                {/* public/dashboard/icons/calendar-02.svg, inlined so stroke
+                    follows currentColor (the source hardcodes #8E8E93). */}
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden
+                >
+                  <path
+                    d="M16 2V6M8 2V6"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M13 4H11C7.22876 4 5.34315 4 4.17157 5.17157C3 6.34315 3 8.22876 3 12V14C3 17.7712 3 19.6569 4.17157 20.8284C5.34315 22 7.22876 22 11 22H13C16.7712 22 18.6569 22 19.8284 20.8284C21 19.6569 21 17.7712 21 14V12C21 8.22876 21 6.34315 19.8284 5.17157C18.6569 4 16.7712 4 13 4Z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M3 10H21"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M11 14H16M8 14H8.00898M13 18H8M16 18H15.991"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
             </div>
             {deadline !== "" && goalSeconds <= 0n && (
               <p className="mt-3 font-body text-[13px] text-red-400">

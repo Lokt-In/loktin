@@ -5,7 +5,11 @@ import {
   targetStatus,
   type TargetStatus,
 } from "../lib/targetMath";
-import { formatUsdc, formatDateShort } from "../../../shared/lib/money";
+import {
+  formatUsdc,
+  formatUsdcAdaptive,
+  formatDateShort,
+} from "../../../shared/lib/money";
 import DashButton from "../../../shared/dash/DashButton";
 
 const STATUS_STYLES: Record<TargetStatus, string> = {
@@ -82,7 +86,10 @@ export default function TargetRow({
 
         <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 font-body text-[13px] text-muted">
           <span>
-            {formatUsdc(goal.deposited)} / {formatUsdc(goal.target_amount)} USDC
+            {/* Adaptive: a real sub-cent deposit would read as 0.00 at 2dp and
+                look like it never landed. */}
+            {formatUsdcAdaptive(goal.deposited)} /{" "}
+            {formatUsdc(goal.target_amount)} USDC
           </span>
           <span>
             <span className="font-semibold text-subtle">Frequency</span>{" "}

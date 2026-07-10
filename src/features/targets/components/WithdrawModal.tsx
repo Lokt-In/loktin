@@ -4,7 +4,7 @@ import {
   isEarlyWithdrawal,
   withdrawalPayout,
 } from "../lib/targetMath";
-import { formatUsdc } from "../../../shared/lib/money";
+import { formatUsdcAdaptive } from "../../../shared/lib/money";
 import DashModal from "../../../shared/dash/DashModal";
 import DashButton from "../../../shared/dash/DashButton";
 import Spinner from "../../../shared/dash/Spinner";
@@ -59,7 +59,7 @@ export default function WithdrawModal({
         <div className="flex items-center justify-between gap-6 py-5">
           <dt className="font-body text-[14.5px] text-muted">Saved so far</dt>
           <dd className="shrink-0 font-body text-[15px] font-bold text-[#eef0f7]">
-            {formatUsdc(goal.deposited)} USDC
+            {formatUsdcAdaptive(goal.deposited)} USDC
           </dd>
         </div>
 
@@ -69,7 +69,7 @@ export default function WithdrawModal({
               Early-exit forfeit (1%)
             </dt>
             <dd className="shrink-0 font-body text-[15px] font-bold text-red-400">
-              -{formatUsdc(forfeit)} USDC
+              -{formatUsdcAdaptive(forfeit)} USDC
             </dd>
           </div>
         )}
@@ -80,7 +80,7 @@ export default function WithdrawModal({
             {loadingYield ? (
               <Spinner className="h-4 w-4 text-muted" />
             ) : (
-              `+${formatUsdc(earned)} USDC`
+              `+${formatUsdcAdaptive(earned)} USDC`
             )}
           </dd>
         </div>
@@ -88,7 +88,7 @@ export default function WithdrawModal({
         <div className="flex items-center justify-between gap-6 border-t border-[#ffffff14] py-5">
           <dt className="font-body text-[14.5px] text-muted">You receive</dt>
           <dd className="shrink-0 font-body text-[15px] font-bold text-cyan">
-            {loadingYield ? "—" : `${formatUsdc(receive)} USDC`}
+            {loadingYield ? "—" : `${formatUsdcAdaptive(receive)} USDC`}
           </dd>
         </div>
       </dl>
