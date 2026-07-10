@@ -1,30 +1,51 @@
-const UNAVAILABLE =
-  "Unavailable: lock maturity follows real ledger time on testnet, which the frontend can't advance.";
+interface Props {
+  /** Days the displayed clock is shifted forward by. */
+  offsetDays: number;
+  onAdvance: () => void;
+  onReset: () => void;
+}
 
 /**
- * Placeholder for the design's time-travel demo affordance.
+ * Demo affordance that shifts the *displayed* clock forward.
  *
- * The contract gates maturity on `env.ledger().timestamp()`, so there is no way
- * for the client to fast-forward it — the control is rendered disabled rather
- * than wired to a no-op, and the copy avoids naming a simulated day that
- * nothing is actually tracking. Wire this up if a contract-side test helper
- * ever lands.
+ * It cannot move real time: `locked_in::unlock` compares
+ * `env.ledger().timestamp()` against `end_date`, so a lock that only looks
+ * matured under the simulated clock still rejects with `LockNotMatured`. Rows
+ * therefore keep Unlock disabled until the lock has really matured — this
+ * previews maturity, it does not enable early withdrawal.
  */
-export default function SimulatedTimeBanner() {
+export default function SimulatedTimeBanner({
+  offsetDays,
+  onAdvance,
+  onReset,
+}: Props) {
   return (
     <div className="border-y border-dashed border-cyan/30 bg-cyan/[0.07]">
-      <div className="mx-auto flex max-w-[1280px] flex-col gap-2 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-10">
+      <div className="mx-auto flex max-w-[1280px] flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 md:px-10">
         <p className="font-mono text-[13.5px] text-subtle">
-          Time simulation — advance time to demo maturity and yield accrual.
+          {offsetDays === 0
+            ? "Time simulation — advance time to demo maturity and yield accrual."
+            : `Simulated day ${offsetDays} — preview only; unlocking still follows real ledger time.`}
         </p>
-        <button
-          type="button"
-          disabled
-          title={UNAVAILABLE}
-          className="self-start font-mono text-[13.5px] font-semibold text-cyan/40 underline underline-offset-4 disabled:cursor-not-allowed sm:self-auto"
-        >
-          Fast-forward 1 day
-        </button>
+
+        <div className="flex shrink-0 items-center gap-4">
+          {offsetDays > 0 && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="font-mono text-[13.5px] text-muted underline underline-offset-4 transition-colors hover:text-white"
+            >
+              Reset
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onAdvance}
+            className="font-mono text-[13.5px] font-semibold text-cyan underline underline-offset-4 transition-colors hover:brightness-125"
+          >
+            Fast-forward 1 day
+          </button>
+        </div>
       </div>
     </div>
   );

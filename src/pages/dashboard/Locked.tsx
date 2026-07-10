@@ -25,14 +25,21 @@ export default function Locked() {
 
   // Recompute maturity on a timer: a lock can cross its end_date while the page
   // is open, and nothing else would re-render the row.
-  const [nowSecs, setNowSecs] = useState(() => Math.floor(Date.now() / 1000));
+  const [realNowSecs, setRealNowSecs] = useState(() =>
+    Math.floor(Date.now() / 1000),
+  );
   useEffect(() => {
     const id = setInterval(
-      () => setNowSecs(Math.floor(Date.now() / 1000)),
+      () => setRealNowSecs(Math.floor(Date.now() / 1000)),
       30_000,
     );
     return () => clearInterval(id);
   }, []);
+
+  // Demo clock. Shifts only what's displayed — `unlock` is still gated on
+  // `realNowSecs`, because the contract compares against the ledger timestamp.
+  const [offsetDays, setOffsetDays] = useState(0);
+  const nowSecs = realNowSecs + offsetDays * 86_400;
 
   useEffect(() => {
     if (!address) void navigate("/");
@@ -71,7 +78,17 @@ export default function Locked() {
 
   return (
     <div className="relative min-h-[calc(100vh-72px)]">
-      <SimulatedTimeBanner />
+      <SimulatedTimeBanner
+        offsetDays={offsetDays}
+        onAdvance={() => {
+          setOffsetDays((d) => d + 1);
+          setPage(1);
+        }}
+        onReset={() => {
+          setOffsetDays(0);
+          setPage(1);
+        }}
+      />
 
       {/* Faint grid wash behind the content, per the design. */}
       <div
@@ -153,6 +170,7 @@ export default function Locked() {
                   key={l.id.toString()}
                   lock={l}
                   nowSecs={nowSecs}
+                  realNowSecs={realNowSecs}
                   onUnlock={setUnlockTarget}
                 />
               ))}
