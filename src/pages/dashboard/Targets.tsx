@@ -14,6 +14,7 @@ import DashButton from "../../shared/dash/DashButton";
 import Spinner from "../../shared/dash/Spinner";
 import FilterPills from "../../shared/dash/FilterPills";
 import Pagination from "../../shared/dash/Pagination";
+import SimulatedTimeBanner from "../../shared/dash/SimulatedTimeBanner";
 
 const FILTERS = ["All", "On track", "Missed"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -46,14 +47,22 @@ export default function Targets() {
 
   // A goal can cross its deadline while the page is open; nothing else would
   // re-render the row.
-  const [nowSecs, setNowSecs] = useState(() => Math.floor(Date.now() / 1000));
+  const [realNowSecs, setRealNowSecs] = useState(() =>
+    Math.floor(Date.now() / 1000),
+  );
   useEffect(() => {
     const id = setInterval(
-      () => setNowSecs(Math.floor(Date.now() / 1000)),
+      () => setRealNowSecs(Math.floor(Date.now() / 1000)),
       30_000,
     );
     return () => clearInterval(id);
   }, []);
+
+  // Demo clock. Shifts only what's displayed. Unlike Locked In, `withdraw` here
+  // doesn't revert early — it deducts 1% — so the payout math and the confirm
+  // button stay on `realNowSecs`.
+  const [offsetDays, setOffsetDays] = useState(0);
+  const nowSecs = realNowSecs + offsetDays * 86_400;
 
   useEffect(() => {
     if (!address) void navigate("/");
@@ -91,7 +100,31 @@ export default function Targets() {
     [getGoalYield],
   );
 
+  // Goals that haven't matured under the *simulated* clock.
+  const pendingGoals = goals.filter(
+    (g) => !g.is_complete && Number(g.end_date) > nowSecs,
+  );
+
+  /**
+   * Jump the display clock just past the soonest pending deadline, so one click
+   * matures a goal. Stepping a literal day would need dozens of clicks.
+   */
+  const advanceToNextMaturity = () => {
+    if (pendingGoals.length === 0) return;
+    const soonestEnd = Math.min(...pendingGoals.map((g) => Number(g.end_date)));
+    // +60s so we land strictly past end_date, never exactly on it.
+    setOffsetDays(Math.ceil((soonestEnd - realNowSecs + 60) / 86_400));
+    setPage(1);
+  };
+
   if (!address) return null;
+
+  // True only when the fast-forward is what makes the goal read as matured. A
+  // fully funded goal is matured on both clocks, so it stays withdrawable.
+  const withdrawSimulatedOnly =
+    withdrawTarget !== null &&
+    targetStatus(withdrawTarget, nowSecs) === "matured" &&
+    targetStatus(withdrawTarget, realNowSecs) !== "matured";
 
   const confirmTopUp = async (amount: bigint) => {
     if (!topUpTarget) return;
@@ -104,6 +137,9 @@ export default function Targets() {
 
   const confirmWithdraw = async () => {
     if (!withdrawTarget) return;
+    // The button is disabled in this state; guard anyway so the simulated clock
+    // can never trigger a withdrawal that silently forfeits 1%.
+    if (withdrawSimulatedOnly) return;
     const payout = await withdraw(withdrawTarget.id);
     if (payout !== null) {
       setWithdrawTarget(null);
@@ -113,6 +149,16 @@ export default function Targets() {
 
   return (
     <div className="relative min-h-[calc(100vh-72px)]">
+      <SimulatedTimeBanner
+        offsetDays={offsetDays}
+        canAdvance={pendingGoals.length > 0}
+        onAdvance={advanceToNextMaturity}
+        onReset={() => {
+          setOffsetDays(0);
+          setPage(1);
+        }}
+      />
+
       {/* Faint grid wash behind the content, per the design. */}
       <div
         aria-hidden
@@ -186,6 +232,7 @@ export default function Targets() {
                   key={g.id.toString()}
                   goal={g}
                   nowSecs={nowSecs}
+                  realNowSecs={realNowSecs}
                   onTopUp={setTopUpTarget}
                   onWithdraw={openWithdraw}
                 />
@@ -218,7 +265,8 @@ export default function Targets() {
         <WithdrawModal
           goal={withdrawTarget}
           goalYield={goalYield}
-          nowSecs={nowSecs}
+          realNowSecs={realNowSecs}
+          simulatedOnly={withdrawSimulatedOnly}
           submitting={submitting}
           error={lastError}
           onConfirm={() => void confirmWithdraw()}

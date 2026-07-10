@@ -1,20 +1,25 @@
 interface Props {
   /** Days the displayed clock is shifted forward by. */
   offsetDays: number;
-  /** False when every lock has already matured (or there are none) — nothing left to skip to. */
+  /** False when everything has already matured (or there's nothing) — nothing left to skip to. */
   canAdvance: boolean;
   onAdvance: () => void;
   onReset: () => void;
 }
 
 /**
- * Demo affordance that shifts the *displayed* clock forward.
+ * Demo affordance that shifts the *displayed* clock forward. Shared by Locked In
+ * and Target Savings.
  *
- * It cannot move real time: `locked_in::unlock` compares
- * `env.ledger().timestamp()` against `end_date`, so a lock that only looks
- * matured under the simulated clock still rejects with `LockNotMatured`. Rows
- * therefore keep Unlock disabled until the lock has really matured — this
- * previews maturity, it does not enable early withdrawal.
+ * It cannot move real time — both contracts compare `env.ledger().timestamp()`
+ * against `end_date`. Callers must keep every money decision on the real clock:
+ *
+ *  - `locked_in::unlock` reverts with `LockNotMatured` before maturity.
+ *  - `target_savings::withdraw` does NOT revert early; it silently charges the
+ *    1% forfeit. Reading maturity off the simulated clock there would hide a
+ *    real deduction, so the payout math and the confirm button stay on real time.
+ *
+ * This previews maturity. It never enables, or discounts, an early exit.
  */
 export default function SimulatedTimeBanner({
   offsetDays,

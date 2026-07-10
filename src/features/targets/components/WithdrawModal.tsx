@@ -4,7 +4,7 @@ import {
   isEarlyWithdrawal,
   withdrawalPayout,
 } from "../lib/targetMath";
-import { formatUsdcAdaptive } from "../../../shared/lib/money";
+import { formatUsdcAdaptive, formatDate } from "../../../shared/lib/money";
 import DashModal from "../../../shared/dash/DashModal";
 import DashButton from "../../../shared/dash/DashButton";
 import Spinner from "../../../shared/dash/Spinner";
@@ -13,7 +13,10 @@ interface Props {
   goal: TargetGoal;
   /** Live yield from `get_goal_yield`; null while loading. */
   goalYield: bigint | null;
-  nowSecs: number;
+  /** True wall clock. Every figure here is computed from this, never the simulated clock. */
+  realNowSecs: number;
+  /** Goal reads as matured only because the display clock was fast-forwarded. */
+  simulatedOnly: boolean;
   submitting: boolean;
   error: string | null;
   onConfirm: () => void;
@@ -25,21 +28,26 @@ interface Props {
  * and closes the goal. The 1% forfeit applies only before the deadline; yield
  * is never forfeited, so it gets its own line either way — the design omits it,
  * but leaving it out would understate what actually lands in the wallet.
+ *
+ * Everything is computed from the *real* clock. `withdraw` doesn't revert early,
+ * it just deducts — so pricing this off a fast-forwarded clock would hide a real
+ * 1% loss behind a "Matured" badge.
  */
 export default function WithdrawModal({
   goal,
   goalYield,
-  nowSecs,
+  realNowSecs,
+  simulatedOnly,
   submitting,
   error,
   onConfirm,
   onCancel,
 }: Props) {
-  const early = isEarlyWithdrawal(goal, nowSecs);
-  const forfeit = forfeitAmount(goal, nowSecs);
+  const early = isEarlyWithdrawal(goal, realNowSecs);
+  const forfeit = forfeitAmount(goal, realNowSecs);
   const loadingYield = goalYield === null;
   const earned = goalYield ?? 0n;
-  const receive = withdrawalPayout(goal, earned, nowSecs);
+  const receive = withdrawalPayout(goal, earned, realNowSecs);
 
   return (
     <DashModal open onClose={onCancel} labelledBy="withdraw-title">
@@ -93,7 +101,15 @@ export default function WithdrawModal({
         </div>
       </dl>
 
-      {early && (
+      {simulatedOnly && (
+        <p className="mt-4 rounded-lg border border-cyan/25 bg-cyan/[0.06] px-4 py-3 font-body text-[13px] text-subtle">
+          This goal only reads as matured because the display clock was
+          fast-forwarded. The contract goes by the ledger, so withdrawing now
+          would still forfeit 1%. It matures on {formatDate(goal.end_date)}.
+        </p>
+      )}
+
+      {early && !simulatedOnly && (
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/[0.06] px-4 py-3 font-body text-[13px] text-red-300">
           Withdrawing now forfeits 1% of what you&apos;ve saved and closes the
           goal for good. It can&apos;t be resumed.
@@ -110,7 +126,15 @@ export default function WithdrawModal({
         <DashButton
           variant={early ? "danger" : "primary"}
           loading={submitting}
-          disabled={loadingYield}
+          // Blocked under simulation: `withdraw` would succeed and quietly take
+          // the 1% the badge says isn't owed. Reset the clock to withdraw early
+          // deliberately.
+          disabled={loadingYield || simulatedOnly}
+          title={
+            simulatedOnly
+              ? `Preview only — reset the simulated clock to withdraw early.`
+              : undefined
+          }
           onClick={onConfirm}
           className="w-full py-3.5"
         >

@@ -10,7 +10,7 @@ import DashButton from "../../shared/dash/DashButton";
 import Spinner from "../../shared/dash/Spinner";
 import FilterPills from "../../shared/dash/FilterPills";
 import Pagination from "../../shared/dash/Pagination";
-import SimulatedTimeBanner from "../../features/locked/components/SimulatedTimeBanner";
+import SimulatedTimeBanner from "../../shared/dash/SimulatedTimeBanner";
 
 const FILTERS = ["All", "Active", "Matured"] as const;
 type Filter = (typeof FILTERS)[number];

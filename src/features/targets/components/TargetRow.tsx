@@ -1,6 +1,7 @@
 import type { TargetGoal } from "../hooks/useTargets";
 import {
   frequencyOf,
+  isEarlyWithdrawal,
   progressPct,
   targetStatus,
   type TargetStatus,
@@ -28,7 +29,10 @@ const STATUS_LABELS: Record<TargetStatus, string> = {
 
 interface Props {
   goal: TargetGoal;
+  /** Display clock — may be shifted forward by the time-simulation banner. */
   nowSecs: number;
+  /** True wall clock. Decides whether a withdrawal really forfeits 1%. */
+  realNowSecs: number;
   onTopUp: (goal: TargetGoal) => void;
   onWithdraw: (goal: TargetGoal) => void;
 }
@@ -36,6 +40,7 @@ interface Props {
 export default function TargetRow({
   goal,
   nowSecs,
+  realNowSecs,
   onTopUp,
   onWithdraw,
 }: Props) {
@@ -43,6 +48,12 @@ export default function TargetRow({
   const pct = progressPct(goal);
   const done = status === "withdrawn";
   const matured = status === "matured";
+
+  // The forfeit depends on `end_date` alone, never on how full the goal is — a
+  // goal that hits its target early still pays 1%, and a fast-forwarded clock
+  // doesn't waive it. Label the destructive action off the real clock rather
+  // than off the "Matured" badge, which can be true for either reason.
+  const early = isEarlyWithdrawal(goal, realNowSecs);
 
   return (
     <li className="flex flex-col gap-4 rounded-2xl border border-[#ffffff14] bg-[#101116] p-5 sm:flex-row sm:items-center sm:gap-6">
@@ -123,11 +134,16 @@ export default function TargetRow({
           </DashButton>
         ) : matured ? (
           <DashButton
-            variant="primary"
+            variant={early ? "danger" : "primary"}
             onClick={() => onWithdraw(goal)}
+            title={
+              early
+                ? `The contract charges the 1% forfeit until ${formatDateShort(goal.end_date)}.`
+                : undefined
+            }
             className="w-full sm:w-auto"
           >
-            Withdraw Now
+            {early ? "Withdraw early" : "Withdraw Now"}
           </DashButton>
         ) : (
           <>
