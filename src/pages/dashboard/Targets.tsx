@@ -6,7 +6,10 @@ import {
   useTargets,
   type TargetGoal,
 } from "../../features/targets/hooks/useTargets";
-import { targetStatus } from "../../features/targets/lib/targetMath";
+import {
+  targetStatus,
+  type TargetStatus,
+} from "../../features/targets/lib/targetMath";
 import TargetRow from "../../features/targets/components/TargetRow";
 import TopUpModal from "../../features/targets/components/TopUpModal";
 import WithdrawModal from "../../features/targets/components/WithdrawModal";
@@ -16,8 +19,15 @@ import FilterPills from "../../shared/dash/FilterPills";
 import Pagination from "../../shared/dash/Pagination";
 import SimulatedTimeBanner from "../../shared/dash/SimulatedTimeBanner";
 
-const FILTERS = ["All", "On track", "Missed"] as const;
+const FILTERS = ["All", "On track", "Missed", "Withdrawn"] as const;
 type Filter = (typeof FILTERS)[number];
+
+/** Filter label -> the TargetStatus it selects. "All" filters nothing. */
+const FILTER_STATUS: Record<Exclude<Filter, "All">, TargetStatus> = {
+  "On track": "on-track",
+  Missed: "missed",
+  Withdrawn: "withdrawn",
+};
 
 const PAGE_SIZE = 5;
 
@@ -70,7 +80,7 @@ export default function Targets() {
 
   const visible = useMemo(() => {
     if (filter === "All") return goals;
-    const want = filter === "On track" ? "on-track" : "missed";
+    const want = FILTER_STATUS[filter];
     return goals.filter((g) => targetStatus(g, nowSecs) === want);
   }, [goals, filter, nowSecs]);
 
