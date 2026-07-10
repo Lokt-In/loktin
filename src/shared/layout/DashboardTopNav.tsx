@@ -142,7 +142,7 @@ export default function DashboardTopNav() {
           </div>
         </div>
 
-        <nav className="-mx-4 flex items-center gap-1 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 md:hidden">
+        <nav className="no-scrollbar -mx-4 flex items-center gap-1 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 md:hidden">
           <NavItems />
         </nav>
       </div>

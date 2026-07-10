@@ -1,6 +1,8 @@
 interface Props {
   /** Days the displayed clock is shifted forward by. */
   offsetDays: number;
+  /** False when every lock has already matured (or there are none) — nothing left to skip to. */
+  canAdvance: boolean;
   onAdvance: () => void;
   onReset: () => void;
 }
@@ -16,6 +18,7 @@ interface Props {
  */
 export default function SimulatedTimeBanner({
   offsetDays,
+  canAdvance,
   onAdvance,
   onReset,
 }: Props) {
@@ -41,9 +44,15 @@ export default function SimulatedTimeBanner({
           <button
             type="button"
             onClick={onAdvance}
-            className="font-mono text-[13.5px] font-semibold text-cyan underline underline-offset-4 transition-colors hover:brightness-125"
+            disabled={!canAdvance}
+            title={
+              canAdvance
+                ? "Jump the displayed clock past the soonest lock's maturity."
+                : "Nothing left to skip to — every lock has already matured."
+            }
+            className="font-mono text-[13.5px] font-semibold text-cyan underline underline-offset-4 transition-colors hover:brightness-125 disabled:cursor-not-allowed disabled:text-cyan/40"
           >
-            Fast-forward 1 day
+            Fast-forward to maturity
           </button>
         </div>
       </div>

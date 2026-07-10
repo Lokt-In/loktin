@@ -24,6 +24,33 @@ const initialState = {
   networkPassphrase: undefined,
 };
 
+/**
+ * Rehydrate the last connected wallet from localStorage *synchronously*.
+ *
+ * `updateCurrentWalletState` also does this, but only from an effect — one
+ * render too late. Guarded routes check `address` on their first render, so
+ * starting empty bounced every dashboard page to the landing page on reload.
+ * The polling loop still runs and will nullify this if the wallet is actually
+ * gone.
+ */
+const restoreState = (): Omit<WalletContextType, "isPending"> => {
+  try {
+    const walletId = storage.getItem("walletId");
+    const address = storage.getItem("walletAddress");
+    const network = storage.getItem("walletNetwork");
+    const networkPassphrase = storage.getItem("networkPassphrase");
+    if (!walletId || !address) return initialState;
+    return {
+      address,
+      network: network ?? undefined,
+      networkPassphrase: networkPassphrase ?? undefined,
+    };
+  } catch {
+    // Malformed JSON or storage unavailable (private mode) — start signed out.
+    return initialState;
+  }
+};
+
 const POLL_INTERVAL = 1000;
 
 export const WalletContext = // eslint-disable-line react-refresh/only-export-components
@@ -31,7 +58,7 @@ export const WalletContext = // eslint-disable-line react-refresh/only-export-co
 
 export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, setState] =
-    useState<Omit<WalletContextType, "isPending">>(initialState);
+    useState<Omit<WalletContextType, "isPending">>(restoreState);
   const [isPending, startTransition] = useTransition();
   const popupLock = useRef(false);
   const signTransaction = wallet.signTransaction.bind(wallet);

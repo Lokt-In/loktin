@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import Spinner from "./Spinner";
 
 type Variant = "primary" | "secondary" | "muted";
 
@@ -17,32 +18,6 @@ const VARIANTS: Record<Variant, string> = {
   // always disabled, so it carries no dimming — the palette is the resting look.
   muted: "border border-[#2C2C33] bg-[#1A1B23] text-subtle",
 };
-
-function Spinner() {
-  return (
-    <svg
-      className="h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="9"
-        stroke="currentColor"
-        strokeWidth="3"
-        opacity="0.25"
-      />
-      <path
-        d="M21 12a9 9 0 0 0-9-9"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 export default function DashButton({
   variant = "primary",

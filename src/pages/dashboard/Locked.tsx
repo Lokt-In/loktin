@@ -7,6 +7,7 @@ import { lockStatus } from "../../features/locked/lib/lockMath";
 import LockRow from "../../features/locked/components/LockRow";
 import UnlockModal from "../../features/locked/components/UnlockModal";
 import DashButton from "../../features/locked/components/DashButton";
+import Spinner from "../../features/locked/components/Spinner";
 import SimulatedTimeBanner from "../../features/locked/components/SimulatedTimeBanner";
 
 const FILTERS = ["All", "Active", "Matured"] as const;
@@ -65,6 +66,26 @@ export default function Locked() {
     [visible, page],
   );
 
+  // Locks that have not yet matured under the *simulated* clock.
+  const pendingLocks = locks.filter(
+    (l) => !l.is_unlocked && Number(l.end_date) > nowSecs,
+  );
+
+  /**
+   * Jump the display clock just past the soonest pending maturity, so a single
+   * click matures a lock. Stepping a literal day at a time would need ~30
+   * clicks to mature even the shortest possible lock (the contract's minimum
+   * term is one 30-day month).
+   */
+  const advanceToNextMaturity = () => {
+    if (pendingLocks.length === 0) return;
+    const soonestEnd = Math.min(...pendingLocks.map((l) => Number(l.end_date)));
+    // +60s so we land strictly past end_date, never exactly on it.
+    const secondsNeeded = soonestEnd - realNowSecs + 60;
+    setOffsetDays(Math.ceil(secondsNeeded / 86_400));
+    setPage(1);
+  };
+
   if (!address) return null;
 
   const confirmUnlock = async () => {
@@ -80,10 +101,8 @@ export default function Locked() {
     <div className="relative min-h-[calc(100vh-72px)]">
       <SimulatedTimeBanner
         offsetDays={offsetDays}
-        onAdvance={() => {
-          setOffsetDays((d) => d + 1);
-          setPage(1);
-        }}
+        canAdvance={pendingLocks.length > 0}
+        onAdvance={advanceToNextMaturity}
         onReset={() => {
           setOffsetDays(0);
           setPage(1);
@@ -130,7 +149,7 @@ export default function Locked() {
         )}
 
         {locks.length > 0 && (
-          <div className="-mx-4 mt-10 flex items-center gap-3 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div className="no-scrollbar -mx-4 mt-10 flex items-center gap-3 overflow-x-auto px-4 sm:mx-0 sm:px-0">
             {FILTERS.map((f) => (
               <button
                 key={f}
@@ -153,9 +172,13 @@ export default function Locked() {
         )}
 
         {loading ? (
-          <p className="py-24 text-center font-body text-[14.5px] text-muted">
-            Loading locks…
-          </p>
+          <div
+            role="status"
+            aria-label="Loading locks"
+            className="flex justify-center py-24 text-cyan"
+          >
+            <Spinner className="h-8 w-8" />
+          </div>
         ) : locks.length === 0 ? (
           <EmptyState onCreate={() => void navigate("/dashboard/locked/new")} />
         ) : visible.length === 0 ? (
