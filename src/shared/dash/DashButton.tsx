@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import Spinner from "./Spinner";
 
-type Variant = "primary" | "secondary" | "muted";
+type Variant = "primary" | "secondary" | "muted" | "danger";
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -17,6 +17,9 @@ const VARIANTS: Record<Variant, string> = {
   // Non-interactive status chip for locks that can't be unlocked yet. It is
   // always disabled, so it carries no dimming — the palette is the resting look.
   muted: "border border-[#2C2C33] bg-[#1A1B23] text-subtle",
+  // Value-destroying actions (early withdrawal forfeits 1% of principal).
+  danger:
+    "border border-red-500/40 bg-red-500/[0.08] text-red-400 hover:bg-red-500/15 disabled:opacity-60",
 };
 
 export default function DashButton({

@@ -1,12 +1,7 @@
 import type { Lock } from "../hooks/useLocks";
-import {
-  formatUsdc,
-  formatDateShort,
-  lockMonths,
-  lockStatus,
-  timeLeftLabel,
-} from "../lib/lockMath";
-import DashButton from "./DashButton";
+import { lockMonths, lockStatus, timeLeftLabel } from "../lib/lockMath";
+import { formatUsdc, formatDateShort } from "../../../shared/lib/money";
+import DashButton from "../../../shared/dash/DashButton";
 
 const STATUS_STYLES = {
   locked: "border-cyan/30 bg-cyan/10 text-cyan",

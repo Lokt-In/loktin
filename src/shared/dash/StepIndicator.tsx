@@ -1,14 +1,20 @@
-const STEPS = ["Amount", "Term", "Review"] as const;
+interface Props {
+  /** Step labels, in order. */
+  steps: readonly string[];
+  /** 1-indexed current step. */
+  current: number;
+}
 
-/** 1 → 2 → 3 progress rail. `current` is 1-indexed. */
-export default function StepIndicator({ current }: { current: number }) {
+/** 1 → 2 → … progress rail for the create wizards. Scrolls rather than wraps
+ *  on narrow screens, since four labelled steps don't fit at 360px. */
+export default function StepIndicator({ steps, current }: Props) {
   return (
-    <ol className="flex items-center justify-center">
-      {STEPS.map((label, i) => {
+    <ol className="no-scrollbar -mx-4 flex items-center overflow-x-auto px-4 sm:mx-0 sm:justify-center sm:px-0">
+      {steps.map((label, i) => {
         const step = i + 1;
         const reached = step <= current;
         return (
-          <li key={label} className="flex items-center">
+          <li key={label} className="flex shrink-0 items-center">
             {i > 0 && (
               <span
                 aria-hidden
@@ -19,7 +25,7 @@ export default function StepIndicator({ current }: { current: number }) {
             )}
             <span className="flex items-center gap-1.5 sm:gap-2.5">
               <span
-                className={`grid h-7 w-7 place-items-center rounded-full border font-body text-[13px] font-semibold ${
+                className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border font-body text-[13px] font-semibold ${
                   step === current
                     ? "border-cyan bg-cyan/15 text-cyan"
                     : reached

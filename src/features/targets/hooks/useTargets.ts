@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useWallet } from "../../../hooks/useWallet";
 import * as TargetSavings from "target_savings";
 import { rpcUrl } from "../../../contracts/util";
@@ -82,6 +82,32 @@ export function useTargets() {
       setLoading(false);
     }
   }, [address]);
+
+  useEffect(() => {
+    if (!address) return;
+    void loadGoals();
+  }, [address, loadGoals]);
+
+  /**
+   * Live interest for a goal. `goal.accrued_yield` is only settled up to
+   * `last_yield_update`, so it lags; `get_goal_yield` rolls it forward to now,
+   * which is what `withdraw` will actually pay out.
+   */
+  const getGoalYield = useCallback(
+    async (targetId: bigint): Promise<bigint | null> => {
+      if (!address) return null;
+      try {
+        const client = makeClient(address);
+        const tx = await client.get_goal_yield({ target_id: targetId });
+        return tx.result.unwrap();
+      } catch (e) {
+        // Non-fatal: the modal falls back to the settled accrued_yield.
+        console.error("getGoalYield:", e);
+        return null;
+      }
+    },
+    [address],
+  );
 
   const createTarget = useCallback(
     async (
@@ -185,6 +211,7 @@ export function useTargets() {
     submitting,
     lastError,
     loadGoals,
+    getGoalYield,
     createTarget,
     manualDeposit,
     withdraw,

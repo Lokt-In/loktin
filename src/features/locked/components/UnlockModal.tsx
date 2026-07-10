@@ -1,7 +1,7 @@
 import type { Lock } from "../hooks/useLocks";
-import { formatUsdc, formatDate } from "../lib/lockMath";
-import DashModal from "./DashModal";
-import DashButton from "./DashButton";
+import { formatUsdc, formatDate } from "../../../shared/lib/money";
+import DashModal from "../../../shared/dash/DashModal";
+import DashButton from "../../../shared/dash/DashButton";
 
 interface Props {
   lock: Lock;

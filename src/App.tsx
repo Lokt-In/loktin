@@ -5,6 +5,7 @@ import Landing from "./pages/Landing";
 import Overview from "./pages/dashboard/Overview";
 import Plans from "./pages/dashboard/Plans";
 import Targets from "./pages/dashboard/Targets";
+import CreateTarget from "./pages/dashboard/CreateTarget";
 import Locked from "./pages/dashboard/Locked";
 import CreateLock from "./pages/dashboard/CreateLock";
 import SpendSave from "./pages/dashboard/SpendSave";
@@ -22,6 +23,7 @@ export default function App() {
         <Route index element={<Overview />} />
         <Route path="plans" element={<Plans />} />
         <Route path="targets" element={<Targets />} />
+        <Route path="targets/new" element={<CreateTarget />} />
         <Route path="locked" element={<Locked />} />
         <Route path="locked/new" element={<CreateLock />} />
         <Route path="spend-save" element={<SpendSave />} />

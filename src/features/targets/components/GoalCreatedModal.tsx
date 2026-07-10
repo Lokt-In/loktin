@@ -2,13 +2,13 @@ import DashModal from "../../../shared/dash/DashModal";
 import DashButton from "../../../shared/dash/DashButton";
 
 interface Props {
-  onViewLocks: () => void;
+  onView: () => void;
   onDismiss: () => void;
 }
 
-export default function SuccessModal({ onViewLocks, onDismiss }: Props) {
+export default function GoalCreatedModal({ onView, onDismiss }: Props) {
   return (
-    <DashModal open onClose={onDismiss} labelledBy="lock-created-title">
+    <DashModal open onClose={onDismiss} labelledBy="goal-created-title">
       <div className="flex flex-col items-center text-center">
         <span className="grid h-16 w-16 place-items-center rounded-full border border-[#34E0A16b] bg-[#34E0A114]">
           <svg
@@ -29,22 +29,23 @@ export default function SuccessModal({ onViewLocks, onDismiss }: Props) {
         </span>
 
         <h2
-          id="lock-created-title"
+          id="goal-created-title"
           className="mt-6 font-heading text-[26px] font-bold text-[#eef0f7]"
         >
-          Lock created
+          Goal created
         </h2>
         <p className="mt-2 font-body text-[14.5px] text-muted">
-          Your USDC is now locked and earning yield via Blend.
+          Your first auto-deposit is scheduled. We&apos;ll notify you as it
+          lands.
         </p>
 
         <div className="mt-8 flex w-full flex-col gap-3">
           <DashButton
             variant="primary"
-            onClick={onViewLocks}
+            onClick={onView}
             className="w-full py-3.5"
           >
-            View my locks
+            View my target savings
           </DashButton>
           <DashButton
             variant="secondary"

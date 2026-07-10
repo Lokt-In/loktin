@@ -8,23 +8,14 @@ import {
   LOCKED_VAULT_CONTRACT_ID,
 } from "../../features/locked/hooks/useLocks";
 import {
-  STROOPS,
   durationSeconds,
-  formatDate,
-  formatUsdc,
-  parseUsdc,
   projectedYield,
 } from "../../features/locked/lib/lockMath";
-import StepIndicator from "../../features/locked/components/StepIndicator";
+import { formatDate, formatUsdc, parseUsdc } from "../../shared/lib/money";
+import StepIndicator from "../../shared/dash/StepIndicator";
 import SuccessModal from "../../features/locked/components/SuccessModal";
-import DashButton from "../../features/locked/components/DashButton";
-
-const PERCENTS = [
-  { label: "25%", frac: 25n },
-  { label: "50%", frac: 50n },
-  { label: "75%", frac: 75n },
-  { label: "Max", frac: 100n },
-];
+import DashButton from "../../shared/dash/DashButton";
+import AmountField from "../../shared/dash/AmountField";
 
 export default function CreateLock() {
   const { address } = useWallet();
@@ -67,13 +58,6 @@ export default function CreateLock() {
   });
 
   if (!address) return null;
-
-  const setPercent = (frac: bigint) => {
-    const raw = (balance * frac) / 100n;
-    // Trim to 2dp so the field shows what the user sees elsewhere in the UI.
-    const trimmed = (raw / (STROOPS / 100n)) * (STROOPS / 100n);
-    setAmountInput((Number(trimmed) / Number(STROOPS)).toFixed(2));
-  };
 
   const confirmAndLock = async () => {
     if (months === null || !amountValid) return;
@@ -132,7 +116,7 @@ export default function CreateLock() {
       </div>
 
       <div className="mt-10">
-        <StepIndicator current={step} />
+        <StepIndicator steps={["Amount", "Term", "Review"]} current={step} />
       </div>
 
       <div
@@ -152,59 +136,22 @@ export default function CreateLock() {
               can&apos;t be withdrawn until your chosen term ends.
             </p>
 
-            <label
-              htmlFor="amount"
-              className="mt-8 block font-body text-[13px] font-semibold tracking-[0.06em] text-[#eef0f7] uppercase"
-            >
-              Amount to lock
-            </label>
-            <div className="mt-3 flex min-h-[74px] items-center rounded-xl border border-[#ffffff14] bg-surface px-5 py-4">
-              <input
+            <div className="mt-8">
+              <AmountField
                 id="amount"
-                inputMode="decimal"
-                placeholder="0.00"
+                label="Amount to lock"
                 value={amountInput}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (/^\d*\.?\d*$/.test(v)) setAmountInput(v);
-                }}
-                // Preflight is off, so the field keeps its UA border/background
-                // and it renders as a second box inside the wrapper's chrome.
-                // Reset on the element, not globally: a blanket `appearance:
-                // none` would strip the native track off SpendSave's range input.
-                className="w-full min-w-0 appearance-none border-0 bg-transparent font-mono text-[17px] text-white outline-none placeholder:text-muted"
+                onChange={setAmountInput}
+                balance={balance}
+                balanceFormatted={balanceFormatted}
+                showPercents
+                error={
+                  overBalance
+                    ? "That's more than your wallet holds."
+                    : undefined
+                }
               />
-              <span className="ml-4 font-mono text-[15px] text-subtle">
-                USDC
-              </span>
             </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {PERCENTS.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  disabled={balance === 0n}
-                  onClick={() => setPercent(p.frac)}
-                  className="rounded-lg border border-[#ffffff14] bg-[#ffffff08] py-3 font-body text-[14px] font-semibold text-subtle transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-5 flex items-center justify-between font-body text-[14px]">
-              <span className="font-semibold text-muted">Wallet balance</span>
-              <span className="font-semibold text-[#eef0f7]">
-                {balanceFormatted} USDC
-              </span>
-            </div>
-
-            {overBalance && (
-              <p className="mt-3 font-body text-[13px] text-red-400">
-                That&apos;s more than your wallet holds.
-              </p>
-            )}
 
             <div className="mt-8 flex items-center justify-between">
               <DashButton
