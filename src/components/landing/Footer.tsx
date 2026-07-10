@@ -1,3 +1,5 @@
+import Wordmark from "../../shared/components/Wordmark";
+
 const COLUMNS = [
   {
     title: "Product",
@@ -56,7 +58,7 @@ export default function Footer() {
         <div className="grid grid-cols-2 gap-10 md:grid-cols-[1.6fr_1fr_1fr_1fr] md:gap-12">
           <div className="col-span-2 md:col-span-1">
             <p className="font-heading text-[22px] font-bold text-white">
-              LoktIn
+              <Wordmark />
             </p>
             <p className="mt-4 max-w-[320px] font-body text-[14px] leading-[21.7px] text-muted">
               Savings and investment on Stellar. Smart contracts hold you to

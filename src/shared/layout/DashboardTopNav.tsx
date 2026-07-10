@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import type { ReactNode } from "react";
 import WalletPill from "./WalletPill";
+import Wordmark from "../components/Wordmark";
 
 /* The design's public/dashboard/icons/*.svg, inlined so `stroke` can follow
    `currentColor`. The source files hardcode #8E8E93 / #1A98AD, which as <img>
@@ -130,7 +131,7 @@ export default function DashboardTopNav() {
             to="/"
             className="shrink-0 font-heading text-[22px] font-bold tracking-tight text-white"
           >
-            LoktIn
+            <Wordmark />
           </NavLink>
 
           <nav className="hidden items-center gap-1 md:flex">
