@@ -1,5 +1,5 @@
 import type { Lock } from "../hooks/useLocks";
-import { formatUsdc } from "../lib/lockMath";
+import { formatUsdc, formatDate } from "../lib/lockMath";
 import DashModal from "./DashModal";
 import DashButton from "./DashButton";
 
@@ -7,6 +7,8 @@ interface Props {
   lock: Lock;
   submitting: boolean;
   error: string | null;
+  /** Lock reads as matured only because the display clock was fast-forwarded. */
+  simulatedOnly: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -20,6 +22,7 @@ export default function UnlockModal({
   lock,
   submitting,
   error,
+  simulatedOnly,
   onConfirm,
   onCancel,
 }: Props) {
@@ -42,14 +45,16 @@ export default function UnlockModal({
         Unlock Funds
       </h2>
       <p className="mt-2 text-center font-body text-[14.5px] text-muted">
-        This lock has matured. Here&apos;s your payout breakdown.
+        {simulatedOnly
+          ? "Preview under simulated time. Here's your payout breakdown."
+          : "This lock has matured. Here's your payout breakdown."}
       </p>
 
       <dl className="mt-7 rounded-xl border border-[#ffffff14] bg-[#ffffff0a] px-6 py-2">
         {rows.map((r) => (
           <div
             key={r.label}
-            className="flex items-center justify-between border-b border-[#ffffff14] py-5 last:border-b-0"
+            className="flex items-center justify-between py-5 "
           >
             <dt className="font-body text-[14.5px] text-muted">{r.label}</dt>
             <dd className="font-body text-[15px] font-bold text-[#eef0f7]">
@@ -57,13 +62,21 @@ export default function UnlockModal({
             </dd>
           </div>
         ))}
-        <div className="flex items-center justify-between border-t border-[#ffffff14] py-5">
+        <div className="flex items-center justify-between py-5">
           <dt className="font-body text-[14.5px] text-muted">You receive</dt>
           <dd className="font-body text-[15px] font-bold text-cyan">
             {formatUsdc(receive)} USDC
           </dd>
         </div>
       </dl>
+
+      {simulatedOnly && (
+        <p className="mt-4 rounded-lg border border-cyan/25 bg-cyan/[0.06] px-4 py-3 font-body text-[13px] text-subtle">
+          This lock only reads as matured because the display clock was
+          fast-forwarded. The contract checks the ledger timestamp, so it
+          won&apos;t release these funds until {formatDate(lock.end_date)}.
+        </p>
+      )}
 
       {error && (
         <p className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 font-body text-[13px] text-red-300">
@@ -75,6 +88,12 @@ export default function UnlockModal({
         <DashButton
           variant="primary"
           loading={submitting}
+          disabled={simulatedOnly}
+          title={
+            simulatedOnly
+              ? `The contract unlocks this on ${formatDate(lock.end_date)}.`
+              : undefined
+          }
           onClick={onConfirm}
           className="w-full py-3.5"
         >

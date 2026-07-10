@@ -88,8 +88,15 @@ export default function Locked() {
 
   if (!address) return null;
 
+  // True when the open lock reads as matured only under the simulated clock.
+  const unlockSimulatedOnly =
+    unlockTarget !== null && realNowSecs < Number(unlockTarget.end_date);
+
   const confirmUnlock = async () => {
     if (!unlockTarget) return;
+    // The button is disabled in this state; guard anyway so no code path can
+    // submit an unlock the contract would reject with LockNotMatured.
+    if (realNowSecs < Number(unlockTarget.end_date)) return;
     const payout = await unlock(unlockTarget.id);
     if (payout !== null) {
       setUnlockTarget(null);
@@ -213,6 +220,7 @@ export default function Locked() {
           lock={unlockTarget}
           submitting={submitting}
           error={lastError}
+          simulatedOnly={unlockSimulatedOnly}
           onConfirm={() => void confirmUnlock()}
           onCancel={() => setUnlockTarget(null)}
         />

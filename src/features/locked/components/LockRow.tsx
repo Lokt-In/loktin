@@ -118,19 +118,18 @@ export default function LockRow({
       </div>
 
       <div className="shrink-0">
-        {simulatedOnly ? (
-          <DashButton
-            variant="primary"
-            disabled
-            title={`Simulated only — the contract unlocks this on ${formatDateShort(lock.end_date)}.`}
-            className="w-full sm:w-auto"
-          >
-            Unlock Now
-          </DashButton>
-        ) : status === "matured" ? (
+        {status === "matured" ? (
+          // Clickable even under simulated time: the modal is a read-only
+          // payout breakdown. It's the Confirm inside it that would fire a tx
+          // the contract rejects, so that's where the real-time gate lives.
           <DashButton
             variant="primary"
             onClick={() => onUnlock(lock)}
+            title={
+              simulatedOnly
+                ? `Simulated — the contract unlocks this on ${formatDateShort(lock.end_date)}.`
+                : undefined
+            }
             className="w-full sm:w-auto"
           >
             Unlock Now

@@ -30,7 +30,9 @@ export default function DashButton({
   return (
     <button
       type="button"
-      disabled={disabled ?? loading}
+      // `??` would let an explicit `disabled={false}` re-enable the button
+      // mid-flight and allow a second submit.
+      disabled={Boolean(disabled) || loading}
       aria-busy={loading || undefined}
       className={`inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 font-body text-[14.5px] font-semibold transition disabled:cursor-not-allowed ${VARIANTS[variant]} ${className}`}
       {...rest}
