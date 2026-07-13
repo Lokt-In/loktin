@@ -1,18 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useWallet } from "../../../hooks/useWallet";
-import {
-  mockDelay,
-  getMockTargets,
-  createMockTarget,
-  depositMockTarget,
-  withdrawMockTarget,
-} from "../../../lib/mockState";
-
-/* ─── REAL IMPORTS (restore when contract auth is fixed) ─────────────────────
 import * as TargetSavings from "target_savings";
 import { rpcUrl } from "../../../contracts/util";
 import { buildClient, sendWithAuth } from "../../../contracts/clientHelpers";
-─── END REAL IMPORTS ──────────────────────────────────────────────────────── */
 
 export type TargetGoal = {
   id: bigint;
@@ -24,133 +14,15 @@ export type TargetGoal = {
   start_date: bigint;
   end_date: bigint;
   deposited: bigint;
+  accrued_yield: bigint;
   last_deposit_date: bigint;
   missed_periods: number;
   is_complete: boolean;
 };
 
+// Single source of truth: the deployed contract id baked into the binding.
 export const TARGET_SAVINGS_CONTRACT_ID =
-  "CAF4L2VNNCUMBGBSHXLHGKLPPKBSF65GGXDQQIBDF4IGJWXPPBOEDBAF";
-
-/* ─── MOCK IMPLEMENTATION ────────────────────────────────────────────────── */
-
-export function useTargets() {
-  const { address } = useWallet();
-  const [goalIds, setGoalIds] = useState<bigint[]>([]);
-  const [goals, setGoals] = useState<TargetGoal[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [lastError, setLastError] = useState<string | null>(null);
-
-  const loadGoals = useCallback(async () => {
-    if (!address) return;
-    setLoading(true);
-    await mockDelay(300);
-    const raw = getMockTargets(address);
-    const parsed: TargetGoal[] = raw.map((t) => ({
-      id: BigInt(t.id),
-      user: t.user,
-      name: t.name,
-      target_amount: BigInt(t.target_amount),
-      period_seconds: BigInt(t.period_seconds),
-      period_amount: BigInt(t.period_amount),
-      start_date: BigInt(t.start_date),
-      end_date: BigInt(t.end_date),
-      deposited: BigInt(t.deposited),
-      last_deposit_date: BigInt(t.last_deposit_date),
-      missed_periods: t.missed_periods,
-      is_complete: t.is_complete,
-    }));
-    setGoalIds(parsed.map((g) => g.id));
-    setGoals(parsed);
-    setLoading(false);
-  }, [address]);
-
-  const createTarget = useCallback(
-    async (
-      name: string,
-      targetAmount: bigint,
-      periodSeconds: bigint,
-      periodAmount: bigint,
-      endDate: bigint,
-    ): Promise<bigint | null> => {
-      if (!address) {
-        setLastError("Wallet not connected");
-        return null;
-      }
-      setSubmitting(true);
-      setLastError(null);
-      try {
-        await mockDelay(800);
-        const t = createMockTarget(
-          address,
-          name,
-          targetAmount,
-          periodSeconds,
-          periodAmount,
-          endDate,
-        );
-        await loadGoals();
-        return BigInt(t.id);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setLastError(msg);
-        return null;
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [address, loadGoals],
-  );
-
-  const manualDeposit = useCallback(
-    async (targetId: bigint, amount: bigint): Promise<boolean> => {
-      if (!address) return false;
-      try {
-        await mockDelay(700);
-        depositMockTarget(address, targetId, amount);
-        await loadGoals();
-        return true;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setLastError(msg);
-        return false;
-      }
-    },
-    [address, loadGoals],
-  );
-
-  const withdraw = useCallback(
-    async (targetId: bigint): Promise<bigint | null> => {
-      if (!address) return null;
-      try {
-        await mockDelay(700);
-        const returned = withdrawMockTarget(address, targetId);
-        await loadGoals();
-        return returned;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setLastError(msg);
-        return null;
-      }
-    },
-    [address, loadGoals],
-  );
-
-  return {
-    goalIds,
-    goals,
-    loading,
-    submitting,
-    lastError,
-    loadGoals,
-    createTarget,
-    manualDeposit,
-    withdraw,
-  };
-}
-
-/* ─── REAL IMPLEMENTATION (restore when contract auth is fixed) ───────────────
+  TargetSavings.networks.testnet.contractId;
 
 type WalletMethods = {
   signTransaction?: ReturnType<typeof useWallet>["signTransaction"];
@@ -167,19 +39,181 @@ function makeClient(address: string, w?: WalletMethods) {
   );
 }
 
-function extractValue(val: unknown): bigint {
-  if (typeof val === "bigint") return val;
-  if (typeof val === "number") return BigInt(val);
-  if (typeof val === "string") return BigInt(val);
-  if (val && typeof val === "object") {
-    const v = val as { i128?: string | number; u64?: string | number; u32?: string | number };
-    return BigInt(v.i128 ?? v.u64 ?? v.u32 ?? 0);
-  }
-  return 0n;
-}
-
 export function useTargets() {
   const { address, signTransaction, signAuthEntry } = useWallet();
-  ... (full real implementation)
+  const [goalIds, setGoalIds] = useState<bigint[]>([]);
+  const [goals, setGoals] = useState<TargetGoal[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+
+  const loadGoals = useCallback(async () => {
+    if (!address) return;
+    setLoading(true);
+    try {
+      const client = makeClient(address);
+      const idsTx = await client.get_user_goals({ user: address });
+      const ids = idsTx.result;
+      const loaded: TargetGoal[] = [];
+      for (const id of ids) {
+        const goalTx = await client.get_target({ target_id: id });
+        const g = goalTx.result.unwrap();
+        loaded.push({
+          id: g.id,
+          user: g.user,
+          name: g.name,
+          target_amount: g.target_amount,
+          period_seconds: g.period_seconds,
+          period_amount: g.period_amount,
+          start_date: g.start_date,
+          end_date: g.end_date,
+          deposited: g.deposited,
+          accrued_yield: g.accrued_yield,
+          last_deposit_date: g.last_deposit_date,
+          missed_periods: g.missed_periods,
+          is_complete: g.is_complete,
+        });
+      }
+      setGoalIds(ids);
+      setGoals(loaded);
+    } catch (e) {
+      setLastError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    if (!address) return;
+    void loadGoals();
+  }, [address, loadGoals]);
+
+  /**
+   * Live interest for a goal. `goal.accrued_yield` is only settled up to
+   * `last_yield_update`, so it lags; `get_goal_yield` rolls it forward to now,
+   * which is what `withdraw` will actually pay out.
+   */
+  const getGoalYield = useCallback(
+    async (targetId: bigint): Promise<bigint | null> => {
+      if (!address) return null;
+      try {
+        const client = makeClient(address);
+        const tx = await client.get_goal_yield({ target_id: targetId });
+        return tx.result.unwrap();
+      } catch (e) {
+        // Non-fatal: the modal falls back to the settled accrued_yield.
+        console.error("getGoalYield:", e);
+        return null;
+      }
+    },
+    [address],
+  );
+
+  const createTarget = useCallback(
+    async (
+      name: string,
+      targetAmount: bigint,
+      periodSeconds: bigint,
+      periodAmount: bigint,
+      endDate: bigint,
+    ): Promise<bigint | null> => {
+      if (!address || !signTransaction) {
+        setLastError("Wallet not connected");
+        return null;
+      }
+      setSubmitting(true);
+      setLastError(null);
+      try {
+        const client = makeClient(address, { signTransaction, signAuthEntry });
+        const tx = await client.create_target({
+          user: address,
+          name,
+          target_amount: targetAmount,
+          period_seconds: periodSeconds,
+          period_amount: periodAmount,
+          end_date: endDate,
+        });
+        const result = await sendWithAuth(tx, address, signAuthEntry);
+        const id = result.unwrap();
+        await loadGoals();
+        return id;
+      } catch (e) {
+        setLastError(e instanceof Error ? e.message : String(e));
+        return null;
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [address, signTransaction, signAuthEntry, loadGoals],
+  );
+
+  const manualDeposit = useCallback(
+    async (targetId: bigint, amount: bigint): Promise<boolean> => {
+      if (!address || !signTransaction) {
+        setLastError("Wallet not connected");
+        return false;
+      }
+      setSubmitting(true);
+      setLastError(null);
+      try {
+        const client = makeClient(address, { signTransaction, signAuthEntry });
+        const tx = await client.manual_deposit({
+          user: address,
+          target_id: targetId,
+          amount,
+        });
+        (await sendWithAuth(tx, address, signAuthEntry)).unwrap();
+        await loadGoals();
+        return true;
+      } catch (e) {
+        setLastError(e instanceof Error ? e.message : String(e));
+        return false;
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [address, signTransaction, signAuthEntry, loadGoals],
+  );
+
+  const withdraw = useCallback(
+    async (targetId: bigint): Promise<bigint | null> => {
+      if (!address || !signTransaction) {
+        setLastError("Wallet not connected");
+        return null;
+      }
+      setSubmitting(true);
+      setLastError(null);
+      try {
+        const client = makeClient(address, { signTransaction, signAuthEntry });
+        const tx = await client.withdraw({
+          user: address,
+          target_id: targetId,
+        });
+        const returned = (
+          await sendWithAuth(tx, address, signAuthEntry)
+        ).unwrap();
+        await loadGoals();
+        return returned;
+      } catch (e) {
+        setLastError(e instanceof Error ? e.message : String(e));
+        return null;
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [address, signTransaction, signAuthEntry, loadGoals],
+  );
+
+  return {
+    goalIds,
+    goals,
+    loading,
+    submitting,
+    lastError,
+    loadGoals,
+    getGoalYield,
+    createTarget,
+    manualDeposit,
+    withdraw,
+  };
 }
-─── END REAL IMPLEMENTATION ─────────────────────────────────────────────── */

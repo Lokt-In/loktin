@@ -1,0 +1,22 @@
+[package]
+name = "mock_pool"
+description = "Mock Blend pool — fixed-APY yield stand-in for testnet (not for mainnet)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+[package.metadata.stellar]
+cargo_inherit = true
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = "23.0.3"
+
+[dev-dependencies]
+stellar-xdr = { version = "23.0.0", features = ["curr", "serde"] }
+soroban-sdk = { version = "23.0.3", features = ["testutils"] }

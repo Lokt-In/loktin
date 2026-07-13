@@ -1,6 +1,18 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env, Map, Vec};
+mod error;
+mod events;
+mod test;
+mod types;
+
+use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
+use soroban_sdk::{
+    contract, contractclient, contractimpl, symbol_short, token, vec, Address, Env, IntoVal, Map,
+    Vec,
+};
+
+use error::Error;
+use types::{DataKey, Lock};
 
 const DAY_IN_LEDGERS: u32 = 17280;
 const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30;
@@ -10,46 +22,15 @@ const SECONDS_PER_MONTH: u64 = 2_592_000; // 30 days
 const SECONDS_PER_YEAR: i128 = 31_536_000;
 const BPS_DENOMINATOR: i128 = 10_000;
 
-// ── Types ────────────────────────────────────────────────────────────
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Lock {
-    pub id: u64,
-    pub user: Address,
-    pub amount: i128,
-    pub apy_basis_points: u32,
-    pub duration_seconds: u64,
-    pub start_date: u64,
-    pub end_date: u64,
-    pub projected_yield: i128,
-    pub is_unlocked: bool,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DataKey {
-    Admin,
-    UsdcToken,
-    LockCounter,
-    Lock(u64),
-    UserLocks(Address),
-    ApyTiers, // Map<u32, u32>: duration_months -> apy_bps
-}
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum Error {
-    Unauthorized = 1,
-    AdminNotSet = 2,
-    LockNotFound = 10,
-    LockAlreadyUnlocked = 11,
-    LockNotMatured = 12,
-    InvalidAmount = 13,
-    InvalidDuration = 14,
-    NotLockOwner = 15,
-    DurationTierMissing = 16,
+// ── Pool interface ───────────────────────────────────────────────────
+// Minimal client for the (mock) Blend pool this contract supplies idle USDC to.
+// Matches mock_pool's `supply` / `withdraw` / `get_position` surface; swapping in
+// real Blend later only changes the bodies below, not this contract's public API.
+#[contractclient(name = "PoolClient")]
+pub trait Pool {
+    fn supply(env: Env, from: Address, amount: i128);
+    fn withdraw(env: Env, from: Address, amount: i128) -> i128;
+    fn get_position(env: Env, supplier: Address) -> i128;
 }
 
 // ── Contract ─────────────────────────────────────────────────────────
@@ -86,7 +67,7 @@ impl LockedIn {
         let mut tiers: Map<u32, u32> = env.storage().instance().get(&DataKey::ApyTiers).unwrap();
         tiers.set(duration_months, apy_basis_points);
         env.storage().instance().set(&DataKey::ApyTiers, &tiers);
-        env.events().publish((symbol_short!("setapy"),), (duration_months, apy_basis_points));
+        events::ApyTierSet { duration_months, apy_basis_points }.publish(&env);
         Ok(())
     }
 
@@ -103,10 +84,24 @@ impl LockedIn {
         env.storage().instance().get(&DataKey::UsdcToken).unwrap()
     }
 
-    // ── User-facing ──
+    // Set (or update) the Blend pool address. Admin-only; set after deploy so the
+    // pool and this contract can be deployed in any order, and so the pool can be
+    // swapped (mock -> real Blend) without redeploying this contract.
+    pub fn set_pool(env: Env, pool: Address) -> Result<(), Error> {
+        let admin = Self::admin(env.clone())?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Pool, &pool);
+        Ok(())
+    }
 
-    /// Lock USDC for a fixed duration. Returns the lock id.
-    /// Computes and stores projected_yield (display only — paid via Blend later).
+    pub fn pool(env: Env) -> Result<Address, Error> {
+        Self::pool_addr(&env)
+    }
+
+    // ── for users ──
+
+    // Lock USDC for a fixed duration. Returns the lock id.
+    // Computes and stores projected_yield (display only for now).
     pub fn lock(env: Env, user: Address, amount: i128, duration_months: u32) -> Result<u64, Error> {
         user.require_auth();
         if amount <= 0 {
@@ -150,12 +145,12 @@ impl LockedIn {
         env.storage().persistent().set(&DataKey::UserLocks(user.clone()), &user_locks);
         Self::extend_ttl(&env, &DataKey::UserLocks(user.clone()));
 
-        env.events().publish((symbol_short!("locked"), user), (id, amount, projected_yield));
+        events::Locked { lock_id: id, user, amount, projected_yield }.publish(&env);
         Ok(id)
     }
 
-    /// Unlock and return principal. Reverts if before end_date.
-    /// (Yield from Blend is added when Blend integration is live.)
+    // Unlock and return principal. Reverts if before end_date.
+    // (Yield from Blend is added when Blend integration is live.)
     pub fn unlock(env: Env, user: Address, lock_id: u64) -> Result<i128, Error> {
         user.require_auth();
         let mut lock = Self::get_lock(env.clone(), lock_id)?;
@@ -171,19 +166,45 @@ impl LockedIn {
         }
 
         let token = Self::token_client(&env);
-        // Today: return principal only. Future: principal + actual blend-accrued yield.
-        let payout = lock.amount;
-        token.transfer(&env.current_contract_address(), &user, &payout);
+        let self_addr = env.current_contract_address();
+
+        // Pay principal + the yield projected at lock time. The principal always
+        // lives either idle here or supplied to the pool; the yield is only real
+        // if funds were put to work in the pool. Pull any shortfall from the pool,
+        // capped at the pool position so this can never trap. If the pool can't
+        // cover the full amount, pay what's available (principal is always covered).
+        let mut payout = lock.amount + lock.projected_yield;
+        let idle = token.balance(&self_addr);
+        if idle < payout {
+            let pulled = match Self::pool_addr(&env) {
+                Ok(pool) => {
+                    let pc = PoolClient::new(&env, &pool);
+                    let position = pc.get_position(&self_addr);
+                    let shortfall = payout - idle;
+                    let pull = if shortfall <= position { shortfall } else { position };
+                    if pull > 0 {
+                        pc.withdraw(&self_addr, &pull);
+                    }
+                    pull
+                }
+                Err(_) => 0,
+            };
+            let available = idle + pulled;
+            if available < payout {
+                payout = available;
+            }
+        }
+        token.transfer(&self_addr, &user, &payout);
 
         lock.is_unlocked = true;
         env.storage().persistent().set(&DataKey::Lock(lock_id), &lock);
         Self::extend_ttl(&env, &DataKey::Lock(lock_id));
 
-        env.events().publish((symbol_short!("unlocked"), user), (lock_id, payout));
+        events::Unlocked { lock_id, user, payout }.publish(&env);
         Ok(payout)
     }
 
-    // ── Reads ──
+    // Read functions
 
     pub fn get_lock(env: Env, lock_id: u64) -> Result<Lock, Error> {
         env.storage().persistent().get(&DataKey::Lock(lock_id)).ok_or(Error::LockNotFound)
@@ -195,27 +216,71 @@ impl LockedIn {
             .unwrap_or_else(|| Vec::new(&env))
     }
 
-    // ── Blend integration stubs ──
+    // ── Blend integration ──
+    // Keeper-driven: move idle USDC into the pool to earn yield, pull it back on
+    // demand, and read the contract's aggregate pool position.
 
+    // Supply `amount` of idle USDC from this contract into the pool.
     pub fn deposit_to_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
-        env.events().publish((symbol_short!("blendDep"),), amount);
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        let pool = Self::pool_addr(&env)?;
+        let token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
+        let self_addr = env.current_contract_address();
+
+        // `pool.supply` makes a nested `token.transfer(self -> pool)` that requires
+        // this contract's auth from inside the pool call. Pre-authorize exactly that
+        // sub-invocation as the current contract.
+        env.authorize_as_current_contract(vec![
+            &env,
+            InvokerContractAuthEntry::Contract(SubContractInvocation {
+                context: ContractContext {
+                    contract: token.clone(),
+                    fn_name: symbol_short!("transfer"),
+                    args: (self_addr.clone(), pool.clone(), amount).into_val(&env),
+                },
+                sub_invocations: vec![&env],
+            }),
+        ]);
+
+        PoolClient::new(&env, &pool).supply(&self_addr, &amount);
+        events::BlendDeposit { amount }.publish(&env);
         Ok(())
     }
 
+    // Withdraw `amount` of USDC from the pool back into this contract.
     pub fn withdraw_from_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
-        env.events().publish((symbol_short!("blendWd"),), amount);
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        let pool = Self::pool_addr(&env)?;
+        // The pool is the direct caller of the token on the way out, so no
+        // authorize_as_current_contract is needed here.
+        PoolClient::new(&env, &pool).withdraw(&env.current_contract_address(), &amount);
+        events::BlendWithdraw { amount }.publish(&env);
         Ok(())
     }
 
-    pub fn blend_position(_env: Env) -> i128 {
-        0
+    // This contract's current pool position (principal + accrued yield). 0 if unset.
+    pub fn blend_position(env: Env) -> i128 {
+        match Self::pool_addr(&env) {
+            Ok(pool) => {
+                PoolClient::new(&env, &pool).get_position(&env.current_contract_address())
+            }
+            Err(_) => 0,
+        }
     }
 
-    // ── Internal ──
+    // Internal functions
+
+    fn pool_addr(env: &Env) -> Result<Address, Error> {
+        env.storage().instance().get(&DataKey::Pool).ok_or(Error::PoolNotSet)
+    }
 
     fn next_id(env: &Env) -> u64 {
         let counter: u64 = env.storage().instance().get(&DataKey::LockCounter).unwrap_or(0);
@@ -233,6 +298,3 @@ impl LockedIn {
         env.storage().persistent().extend_ttl(key, LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND);
     }
 }
-
-#[cfg(test)]
-mod test;

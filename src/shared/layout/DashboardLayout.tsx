@@ -1,32 +1,17 @@
 import { Outlet } from "react-router-dom";
-import DashboardSidebar from "./DashboardSidebar";
+import DashboardTopNav from "./DashboardTopNav";
+import UsdcTrustlinePrompt from "../components/UsdcTrustlinePrompt";
 
+/**
+ * Dashboard chrome. `.lk-theme` opts this subtree out of the legacy sharp-edge
+ * enforcement in base.css so the redesign's rounded surfaces apply.
+ */
 export default function DashboardLayout() {
   return (
-    <div
-      style={{
-        display: "flex",
-        minHeight: "calc(100vh - var(--nav-height))",
-        flexDirection: "column",
-      }}
-    >
-      <div
-        style={{ display: "flex", flex: 1 }}
-        className="dashboard-layout-flex"
-      >
-        <DashboardSidebar />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Outlet />
-        </div>
-      </div>
-      <style>{`
-        @media (min-width: 900px) {
-          .dashboard-layout-flex { flex-direction: row; }
-        }
-        @media (max-width: 899px) {
-          .dashboard-layout-flex { flex-direction: column; }
-        }
-      `}</style>
+    <div className="lk-theme min-h-screen bg-ink font-body text-white">
+      <DashboardTopNav />
+      <UsdcTrustlinePrompt />
+      <Outlet />
     </div>
   );
 }

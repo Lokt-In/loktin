@@ -1,6 +1,28 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, token, Address, Env, String, Vec};
+mod error;
+mod events;
+mod types;
+
+use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
+use soroban_sdk::{
+    contract, contractclient, contractimpl, symbol_short, token, vec, Address, Env, IntoVal, String,
+    Vec,
+};
+
+use error::Error;
+use types::{DataKey, TargetGoal};
+
+// ── Pool interface ───────────────────────────────────────────────────
+// Minimal client for the (mock) Blend pool this contract supplies idle USDC to.
+// Matches mock_pool's surface; swapping in real Blend later only changes the
+// bodies below, not this contract's public API.
+#[contractclient(name = "PoolClient")]
+pub trait Pool {
+    fn supply(env: Env, from: Address, amount: i128);
+    fn withdraw(env: Env, from: Address, amount: i128) -> i128;
+    fn get_position(env: Env, supplier: Address) -> i128;
+}
 
 const DAY_IN_LEDGERS: u32 = 17280; // ~24h
 const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30;
@@ -8,54 +30,8 @@ const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365;
 
 const FORFEIT_BPS: u32 = 100; // 1% on early withdrawal
 const BPS_DENOMINATOR: i128 = 10_000;
-
-// ── Types ────────────────────────────────────────────────────────────
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TargetGoal {
-    pub id: u64,
-    pub user: Address,
-    pub name: String,
-    pub target_amount: i128,
-    pub period_seconds: u64,
-    pub period_amount: i128,
-    pub start_date: u64,
-    pub end_date: u64,
-    pub deposited: i128,
-    pub last_deposit_date: u64,
-    pub missed_periods: u32,
-    pub is_complete: bool,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DataKey {
-    Admin,
-    Keeper,
-    UsdcToken,
-    FeeRecipient,
-    GoalCounter,
-    Goal(u64),
-    UserGoals(Address),
-}
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum Error {
-    Unauthorized = 1,
-    AdminNotSet = 2,
-    GoalNotFound = 10,
-    GoalAlreadyComplete = 11,
-    InvalidAmount = 12,
-    InvalidDuration = 13,
-    InvalidPeriod = 14,
-    PeriodNotDue = 15,
-    InsufficientUserBalance = 16,
-    InsufficientUserAllowance = 17,
-    NotGoalOwner = 18,
-}
+const SECONDS_PER_YEAR: i128 = 31_536_000;
+const DEFAULT_YIELD_APY_BPS: u32 = 1000; // 10%, matches the mock pool
 
 // ── Contract ─────────────────────────────────────────────────────────
 
@@ -74,7 +50,7 @@ impl TargetSavings {
         env.storage().instance().set(&DataKey::GoalCounter, &0u64);
     }
 
-    // ── Admin / config ──
+    // Admin / config
 
     pub fn admin(env: Env) -> Result<Address, Error> {
         env.storage().instance().get(&DataKey::Admin).ok_or(Error::AdminNotSet)
@@ -106,10 +82,36 @@ impl TargetSavings {
         env.storage().instance().get(&DataKey::UsdcToken).unwrap()
     }
 
-    // ── User-facing ──
+    // Set (or update) the Blend pool address. Admin-only; set after deploy so the
+    // pool can be swapped (mock -> real Blend) without redeploying this contract.
+    pub fn set_pool(env: Env, pool: Address) -> Result<(), Error> {
+        let admin = Self::admin(env.clone())?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Pool, &pool);
+        Ok(())
+    }
 
-    /// Create a new target savings goal. The user must have approved the contract
-    /// to spend USDC up to `target_amount` on the USDC token contract.
+    pub fn pool(env: Env) -> Result<Address, Error> {
+        Self::pool_addr(&env)
+    }
+
+    // APY (bps) used to accrue per-goal interest. Should match the pool's APY so
+    // the pool can cover payouts; admin-settable for that reason.
+    pub fn set_yield_apy(env: Env, apy_bps: u32) -> Result<(), Error> {
+        let admin = Self::admin(env.clone())?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::YieldApyBps, &apy_bps);
+        Ok(())
+    }
+
+    pub fn yield_apy_bps(env: Env) -> u32 {
+        Self::yield_apy(&env)
+    }
+
+    // User functions
+
+    // Create a new target savings goal. The user must have approved the contract
+    // to spend USDC up to `target_amount` on the USDC token contract.
     pub fn create_target(
         env: Env,
         user: Address,
@@ -144,9 +146,11 @@ impl TargetSavings {
             start_date: now,
             end_date,
             deposited: 0,
-            last_deposit_date: now, // first period starts now (next due in `period_seconds`)
+            last_deposit_date: now,
             missed_periods: 0,
             is_complete: false,
+            accrued_yield: 0,
+            last_yield_update: now,
         };
 
         env.storage().persistent().set(&DataKey::Goal(id), &goal);
@@ -160,11 +164,11 @@ impl TargetSavings {
         env.storage().persistent().set(&DataKey::UserGoals(user.clone()), &user_goals);
         Self::extend_ttl(&env, &DataKey::UserGoals(user.clone()));
 
-        env.events().publish((symbol_short!("created"), user), id);
+        events::TargetCreated { target_id: id, user }.publish(&env);
         Ok(id)
     }
 
-    /// Manually deposit additional funds into a goal (top-up).
+    // Manually deposit additional funds into a goal (to.
     pub fn manual_deposit(env: Env, user: Address, target_id: u64, amount: i128) -> Result<(), Error> {
         user.require_auth();
         if amount <= 0 {
@@ -181,11 +185,13 @@ impl TargetSavings {
         let token = Self::token_client(&env);
         token.transfer(&user, &env.current_contract_address(), &amount);
 
+        // Lock in interest on the existing balance before it grows.
+        Self::settle_goal_yield(&env, &mut goal, env.ledger().timestamp());
         goal.deposited += amount;
         env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
         Self::extend_ttl(&env, &DataKey::Goal(target_id));
 
-        env.events().publish((symbol_short!("manualdep"), user), (target_id, amount));
+        events::ManualDeposit { target_id, user, amount }.publish(&env);
         Ok(())
     }
 
@@ -202,14 +208,23 @@ impl TargetSavings {
 
         let now = env.ledger().timestamp();
         let token = Self::token_client(&env);
-        let total = goal.deposited;
 
-        let (to_user, forfeit) = if now < goal.end_date {
-            let f = total * (FORFEIT_BPS as i128) / BPS_DENOMINATOR;
-            (total - f, f)
+        // Settle interest up to now, then make sure the contract holds principal +
+        // yield, pulling any shortfall from the pool (capped so it can't trap).
+        Self::settle_goal_yield(&env, &mut goal, now);
+        let principal = goal.deposited;
+        let needed = principal + goal.accrued_yield;
+        let available = Self::ensure_idle(&env, &token, needed);
+        // Pay all the yield the contract can actually cover; principal always fits.
+        let payable_yield = available - principal;
+
+        // 1% forfeit on principal for early withdrawal; yield is never forfeited.
+        let forfeit = if now < goal.end_date {
+            principal * (FORFEIT_BPS as i128) / BPS_DENOMINATOR
         } else {
-            (total, 0)
+            0
         };
+        let to_user = principal - forfeit + payable_yield;
 
         if to_user > 0 {
             token.transfer(&env.current_contract_address(), &user, &to_user);
@@ -220,15 +235,16 @@ impl TargetSavings {
         }
 
         goal.deposited = 0;
+        goal.accrued_yield = 0;
         goal.is_complete = true;
         env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
         Self::extend_ttl(&env, &DataKey::Goal(target_id));
 
-        env.events().publish((symbol_short!("withdraw"), user), (target_id, to_user, forfeit));
+        events::Withdrawn { target_id, user, to_user, forfeit }.publish(&env);
         Ok(to_user)
     }
 
-    // ── Keeper-facing ──
+    // Keeper
 
     /// Process a single period for a goal: pulls `period_amount` from the user's wallet
     /// via `transfer_from`. If the user lacks balance/allowance, logs a missed period.
@@ -258,7 +274,7 @@ impl TargetSavings {
             goal.last_deposit_date = next_due;
             env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
             Self::extend_ttl(&env, &DataKey::Goal(target_id));
-            env.events().publish((symbol_short!("missed"), goal.user.clone()), target_id);
+            events::Missed { target_id, user: goal.user.clone() }.publish(&env);
             return Ok(());
         }
 
@@ -270,6 +286,8 @@ impl TargetSavings {
             &goal.period_amount,
         );
 
+        // Lock in interest on the existing balance before it grows.
+        Self::settle_goal_yield(&env, &mut goal, now);
         goal.deposited += goal.period_amount;
         goal.last_deposit_date = next_due;
 
@@ -280,7 +298,7 @@ impl TargetSavings {
 
         env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
         Self::extend_ttl(&env, &DataKey::Goal(target_id));
-        env.events().publish((symbol_short!("deposit"), goal.user.clone()), (target_id, goal.period_amount));
+        events::PeriodDeposit { target_id, user: goal.user.clone(), amount: goal.period_amount }.publish(&env);
         Ok(())
     }
 
@@ -296,27 +314,125 @@ impl TargetSavings {
             .unwrap_or_else(|| Vec::new(&env))
     }
 
-    // ── Blend integration stubs ──
+    // This goal's interest earned so far, rolled forward to *now*. This is the
+    // exact number to show on the goal (paid on top of principal at withdrawal).
+    pub fn get_goal_yield(env: Env, target_id: u64) -> Result<i128, Error> {
+        let mut goal = Self::get_target(env.clone(), target_id)?;
+        Self::settle_goal_yield(&env, &mut goal, env.ledger().timestamp());
+        Ok(goal.accrued_yield)
+    }
+
+    // ── Blend integration ──
+    // Keeper-driven: move idle USDC into the pool to earn yield while goals fill,
+    // pull it back on demand, and read the contract's aggregate pool position.
+    // Each goal accrues its own interest (see settle_goal_yield / get_goal_yield);
+    // the pool holds the funds backing those payouts.
 
     pub fn deposit_to_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
-        env.events().publish((symbol_short!("blendDep"),), amount);
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        let pool = Self::pool_addr(&env)?;
+        let token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
+        let self_addr = env.current_contract_address();
+
+        // pool.supply makes a nested token.transfer(self -> pool) that needs this
+        // contract's auth from inside the pool call; pre-authorize exactly that.
+        env.authorize_as_current_contract(vec![
+            &env,
+            InvokerContractAuthEntry::Contract(SubContractInvocation {
+                context: ContractContext {
+                    contract: token.clone(),
+                    fn_name: symbol_short!("transfer"),
+                    args: (self_addr.clone(), pool.clone(), amount).into_val(&env),
+                },
+                sub_invocations: vec![&env],
+            }),
+        ]);
+
+        PoolClient::new(&env, &pool).supply(&self_addr, &amount);
+        events::BlendDeposit { amount }.publish(&env);
         Ok(())
     }
 
     pub fn withdraw_from_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
-        env.events().publish((symbol_short!("blendWd"),), amount);
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        let pool = Self::pool_addr(&env)?;
+        PoolClient::new(&env, &pool).withdraw(&env.current_contract_address(), &amount);
+        events::BlendWithdraw { amount }.publish(&env);
         Ok(())
     }
 
-    pub fn blend_position(_env: Env) -> i128 {
-        0
+    pub fn blend_position(env: Env) -> i128 {
+        match Self::pool_addr(&env) {
+            Ok(pool) => {
+                PoolClient::new(&env, &pool).get_position(&env.current_contract_address())
+            }
+            Err(_) => 0,
+        }
     }
 
     // ── Internal helpers ──
+
+    fn pool_addr(env: &Env) -> Result<Address, Error> {
+        env.storage().instance().get(&DataKey::Pool).ok_or(Error::PoolNotSet)
+    }
+
+    fn yield_apy(env: &Env) -> u32 {
+        env.storage().instance().get(&DataKey::YieldApyBps).unwrap_or(DEFAULT_YIELD_APY_BPS)
+    }
+
+    // Roll a goal's accrued interest forward to `now` (in memory). Must be called
+    // before any change to `deposited` so each period earns at its own balance.
+    fn settle_goal_yield(env: &Env, goal: &mut TargetGoal, now: u64) {
+        if goal.last_yield_update == 0 {
+            goal.last_yield_update = now;
+            return;
+        }
+        if now > goal.last_yield_update && goal.deposited > 0 {
+            let apy = Self::yield_apy(env) as i128;
+            let elapsed = (now - goal.last_yield_update) as i128;
+            goal.accrued_yield +=
+                goal.deposited * apy * elapsed / (BPS_DENOMINATOR * SECONDS_PER_YEAR);
+        }
+        goal.last_yield_update = now;
+    }
+
+    // Ensure the contract holds at least `target` USDC, pulling the shortfall from
+    // the pool (capped at the pool position so it can never trap). Returns the
+    // amount actually available (== `target`, or less if the pool can't cover it).
+    fn ensure_idle(env: &Env, token: &token::TokenClient, target: i128) -> i128 {
+        let self_addr = env.current_contract_address();
+        let idle = token.balance(&self_addr);
+        if idle >= target {
+            return target;
+        }
+        let pulled = match Self::pool_addr(env) {
+            Ok(pool) => {
+                let pc = PoolClient::new(env, &pool);
+                let position = pc.get_position(&self_addr);
+                let shortfall = target - idle;
+                let pull = if shortfall <= position { shortfall } else { position };
+                if pull > 0 {
+                    pc.withdraw(&self_addr, &pull);
+                }
+                pull
+            }
+            Err(_) => 0,
+        };
+        let available = idle + pulled;
+        if available < target {
+            available
+        } else {
+            target
+        }
+    }
 
     fn next_id(env: &Env) -> u64 {
         let counter: u64 = env.storage().instance().get(&DataKey::GoalCounter).unwrap_or(0);

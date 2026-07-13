@@ -1,19 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import {
-  Contract,
-  rpc as StellarRpc,
-  Address,
-  scValToNative,
-  xdr,
-  TransactionBuilder,
-  BASE_FEE,
-} from "@stellar/stellar-sdk";
-import { rpcUrl } from "../../contracts/util";
-import { useWallet } from "../../hooks/useWallet";
-import { USDC_CONTRACT_ID } from "../../hooks/useUsdcBalance";
+import { useEffect } from "react";
+import { useUsdcAllowance } from "../../hooks/useUsdcAllowance";
 import Button from "./Button";
-
-const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
 
 /**
  * Reusable allowance prompt: ensures the connected wallet has approved
@@ -25,7 +12,7 @@ const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
 interface Props {
   spenderContract: string;
   requiredAmount: bigint; // raw stroops
-  expirationLedger?: number; // optional ledger TTL for the allowance
+  endDate?: bigint; // goal end (unix seconds); allowance expires then, capped at the network max
   onReady: () => void; // called when allowance is sufficient
   label?: string; // override prompt label
 }
@@ -33,133 +20,19 @@ interface Props {
 export default function UsdcAllowance({
   spenderContract,
   requiredAmount,
+  endDate,
   onReady,
   label,
 }: Props) {
-  const { address, signTransaction } = useWallet();
-  const [allowance, setAllowance] = useState<bigint>(0n);
-  const [loading, setLoading] = useState(true);
-  const [approving, setApproving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadAllowance = useCallback(async () => {
-    if (!address) return;
-    setLoading(true);
-    try {
-      const server = new StellarRpc.Server(rpcUrl, {
-        allowHttp: rpcUrl.startsWith("http://"),
-      });
-      const usdcContract = new Contract(USDC_CONTRACT_ID);
-      const op = usdcContract.call(
-        "allowance",
-        new Address(address).toScVal(),
-        new Address(spenderContract).toScVal(),
-      );
-      const account = await server.getAccount(address);
-      const tx = new TransactionBuilder(account, {
-        fee: BASE_FEE,
-        networkPassphrase: NETWORK_PASSPHRASE,
-      })
-        .addOperation(op)
-        .setTimeout(30)
-        .build();
-      const sim = await server.simulateTransaction(tx);
-      if ("result" in sim && sim.result?.retval) {
-        const v = scValToNative(sim.result.retval) as
-          | bigint
-          | number
-          | string
-          | null
-          | undefined;
-        setAllowance(typeof v === "bigint" ? v : BigInt(v ?? 0));
-      } else {
-        setAllowance(0n);
-      }
-    } catch (e) {
-      console.error("loadAllowance:", e);
-      setAllowance(0n);
-    } finally {
-      setLoading(false);
-    }
-  }, [address, spenderContract]);
+  const { sufficient, loading, approving, error, approve } = useUsdcAllowance({
+    spenderContract,
+    requiredAmount,
+    endDate,
+  });
 
   useEffect(() => {
-    void loadAllowance();
-  }, [loadAllowance]);
-
-  // If sufficient, immediately call onReady
-  useEffect(() => {
-    if (!loading && allowance >= requiredAmount && requiredAmount > 0n) {
-      onReady();
-    }
-  }, [loading, allowance, requiredAmount, onReady]);
-
-  const handleApprove = async () => {
-    if (!address || !signTransaction) return;
-    setApproving(true);
-    setError(null);
-    try {
-      const server = new StellarRpc.Server(rpcUrl, {
-        allowHttp: rpcUrl.startsWith("http://"),
-      });
-      const usdcContract = new Contract(USDC_CONTRACT_ID);
-
-      const latestLedger = (await server.getLatestLedger()).sequence;
-      const expirationLedger = latestLedger + 535_680; // ~30 days at 5s/ledger
-
-      const op = usdcContract.call(
-        "approve",
-        new Address(address).toScVal(),
-        new Address(spenderContract).toScVal(),
-        xdr.ScVal.scvI128(
-          new xdr.Int128Parts({
-            hi: xdr.Int64.fromString((requiredAmount >> 64n).toString()),
-            lo: xdr.Uint64.fromString(
-              (requiredAmount & 0xffffffffffffffffn).toString(),
-            ),
-          }),
-        ),
-        xdr.ScVal.scvU32(expirationLedger),
-      );
-
-      const account = await server.getAccount(address);
-      const tx = new TransactionBuilder(account, {
-        fee: BASE_FEE,
-        networkPassphrase: NETWORK_PASSPHRASE,
-      })
-        .addOperation(op)
-        .setTimeout(30)
-        .build();
-
-      const prepared = await server.prepareTransaction(tx);
-      const signed = await signTransaction(prepared.toXDR(), {
-        networkPassphrase: NETWORK_PASSPHRASE,
-      });
-      const signedXdr =
-        typeof signed === "string" ? signed : signed.signedTxXdr;
-      const finalTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
-      const send = await server.sendTransaction(finalTx);
-
-      // Poll until success
-      if (send.status === "PENDING") {
-        let status = "NOT_FOUND";
-        for (let i = 0; i < 30; i++) {
-          await new Promise((r) => setTimeout(r, 1000));
-          const res = await server.getTransaction(send.hash);
-          status = res.status;
-          if (status === "SUCCESS" || status === "FAILED") break;
-        }
-        if (status !== "SUCCESS") throw new Error(`Approve tx ${status}`);
-      }
-      await loadAllowance();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error("approve failed:", e);
-      setError(msg);
-    } finally {
-      setApproving(false);
-    }
-  };
+    if (sufficient) onReady();
+  }, [sufficient, onReady]);
 
   if (loading) {
     return (
@@ -168,7 +41,7 @@ export default function UsdcAllowance({
       </p>
     );
   }
-  if (allowance >= requiredAmount && requiredAmount > 0n) {
+  if (sufficient) {
     return null; // sufficient, no UI needed
   }
   return (
@@ -214,7 +87,7 @@ export default function UsdcAllowance({
       <Button
         variant="primary"
         size="sm"
-        onClick={() => void handleApprove()}
+        onClick={() => void approve()}
         isLoading={approving}
       >
         Approve {(Number(requiredAmount) / 10_000_000).toFixed(2)} USDC →

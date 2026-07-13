@@ -11,11 +11,12 @@ import { globalIgnores } from "eslint/config";
 export default tseslint.config(
   globalIgnores([
     "dist",
+    "target",
     "packages",
-    "docs",
     "keeper",
     "src/contracts/*",
     "!src/contracts/util.ts",
+    "!src/contracts/clientHelpers.ts",
   ]),
   {
     extends: [

@@ -1,297 +1,216 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "../../hooks/useWallet";
-import {
-  useLocks,
-  LOCKED_VAULT_CONTRACT_ID,
-} from "../../features/locked/hooks/useLocks";
+import { useLocks, type Lock } from "../../features/locked/hooks/useLocks";
 import { useUsdcBalance } from "../../hooks/useUsdcBalance";
-import LockCard from "../../features/locked/components/LockCard";
-import CreateLockForm from "../../features/locked/components/CreateLockForm";
-import UsdcAllowance from "../../shared/components/UsdcAllowance";
-import Button from "../../shared/components/Button";
+import { lockStatus } from "../../features/locked/lib/lockMath";
+import LockRow from "../../features/locked/components/LockRow";
+import UnlockModal from "../../features/locked/components/UnlockModal";
+import DashButton from "../../shared/dash/DashButton";
+import Spinner from "../../shared/dash/Spinner";
+import FilterPills from "../../shared/dash/FilterPills";
+import Pagination from "../../shared/dash/Pagination";
+
+const FILTERS = ["All", "Active", "Matured"] as const;
+type Filter = (typeof FILTERS)[number];
+
+const PAGE_SIZE = 5;
 
 export default function Locked() {
   const { address } = useWallet();
   const navigate = useNavigate();
-  const { locks, loading, submitting, lastError, apyTiers, lock, unlock } =
-    useLocks();
-  const { formatted: usdcFormatted, refresh: refreshBalance } =
-    useUsdcBalance();
-  const [showCreate, setShowCreate] = useState(false);
-  const [pendingLock, setPendingLock] = useState<{
-    amount: bigint;
-    durationMonths: number;
-  } | null>(null);
+  const { locks, loading, submitting, lastError, unlock } = useLocks();
+  const { refresh: refreshBalance } = useUsdcBalance();
+  const [filter, setFilter] = useState<Filter>("All");
+  const [page, setPage] = useState(1);
+  const [unlockTarget, setUnlockTarget] = useState<Lock | null>(null);
+
+  // Recompute maturity on a timer: a lock can cross its end_date while the page
+  // is open, and nothing else would re-render the row.
+  const [realNowSecs, setRealNowSecs] = useState(() =>
+    Math.floor(Date.now() / 1000),
+  );
+  useEffect(() => {
+    const id = setInterval(
+      () => setRealNowSecs(Math.floor(Date.now() / 1000)),
+      30_000,
+    );
+    return () => clearInterval(id);
+  }, []);
+
+  const nowSecs = realNowSecs;
 
   useEffect(() => {
     if (!address) void navigate("/");
-  }, [address]);
+  }, [address, navigate]);
+
+  const visible = useMemo(() => {
+    if (filter === "All") return locks;
+    const want = filter === "Active" ? "locked" : "matured";
+    return locks.filter((l) => lockStatus(l, nowSecs) === want);
+  }, [locks, filter, nowSecs]);
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+
+  // The visible set can shrink under the current page — unlocking the last
+  // matured lock, or a lock maturing out of the Active filter — which would
+  // otherwise strand the user on an empty page.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const paged = useMemo(
+    () => visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [visible, page],
+  );
+
   if (!address) return null;
 
-  const submit = (amount: bigint, durationMonths: number) => {
-    setPendingLock({ amount, durationMonths });
-  };
+  // True when the open lock reads as matured only under the simulated clock.
+  const unlockSimulatedOnly =
+    unlockTarget !== null && realNowSecs < Number(unlockTarget.end_date);
 
-  const finishLock = async () => {
-    if (!pendingLock) return;
-    const id = await lock(pendingLock.amount, pendingLock.durationMonths);
-    setPendingLock(null);
-    if (id !== null) {
-      setShowCreate(false);
+  const confirmUnlock = async () => {
+    if (!unlockTarget) return;
+    // The button is disabled in this state; guard anyway so no code path can
+    // submit an unlock the contract would reject with LockNotMatured.
+    if (realNowSecs < Number(unlockTarget.end_date)) return;
+    const payout = await unlock(unlockTarget.id);
+    if (payout !== null) {
+      setUnlockTarget(null);
       void refreshBalance();
-      alert(
-        `Lock #${id} created. Funds locked for ${pendingLock.durationMonths} month(s).`,
-      );
     }
   };
 
-  const totalLocked = locks
-    .filter((l) => !l.is_unlocked)
-    .reduce((sum, l) => sum + Number(l.amount) / 10_000_000, 0);
-  const totalYield = locks
-    .filter((l) => !l.is_unlocked)
-    .reduce((sum, l) => sum + Number(l.projected_yield) / 10_000_000, 0);
-
   return (
-    <div style={{ padding: "var(--sp-8) var(--sp-6)", maxWidth: 960 }}>
+    <div className="relative min-h-[calc(100vh-72px)]">
+      {/* Faint grid wash behind the content, per the design. */}
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: "var(--sp-6)",
-        }}
+        aria-hidden
+        className="pointer-events-none absolute inset-0 overflow-hidden"
       >
-        <div>
-          <h1
-            style={{
-              fontSize: "var(--font-size-2xl)",
-              fontWeight: 700,
-              marginBottom: "var(--sp-2)",
-            }}
-          >
-            Locked In
-          </h1>
-          <p
-            style={{
-              fontSize: "var(--font-size-sm)",
-              color: "var(--fg-muted)",
-            }}
-          >
-            {locks.filter((l) => !l.is_unlocked).length} active lock
-            {locks.filter((l) => !l.is_unlocked).length !== 1 ? "s" : ""} · no
-            early withdrawal
-          </p>
-        </div>
-        <Button
-          variant={showCreate ? "ghost" : "primary"}
-          size="md"
-          onClick={() => {
-            setShowCreate(!showCreate);
-            setPendingLock(null);
-          }}
-        >
-          {showCreate ? "← Cancel" : "+ New Lock"}
-        </Button>
+        <img
+          src="/dashboard/element/girdline.png"
+          alt=""
+          className="absolute top-0 left-1/2 w-[1283px] max-w-none -translate-x-1/2 opacity-30 select-none"
+        />
       </div>
 
-      {/* Summary */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: 0,
-          border: "1px solid var(--border)",
-          marginBottom: "var(--sp-6)",
-        }}
-      >
-        {[
-          { label: "Wallet", value: `${usdcFormatted} USDC` },
-          { label: "Total Locked", value: `${totalLocked.toFixed(2)} USDC` },
-          {
-            label: "Projected Yield",
-            value: `+${totalYield.toFixed(4)} USDC`,
-            accent: true,
-          },
-        ].map((s, i) => (
-          <div
-            key={s.label}
-            style={{
-              padding: "var(--sp-4)",
-              borderRight: i < 2 ? "1px solid var(--border)" : "none",
-            }}
-          >
-            <p
-              style={{
-                fontSize: "var(--font-size-xs)",
-                color: "var(--fg-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                marginBottom: "var(--sp-1)",
-              }}
-            >
-              {s.label}
-            </p>
-            <p
-              style={{
-                fontSize: "var(--font-size-md)",
-                fontWeight: 600,
-                color: s.accent ? "var(--accent-primary)" : "var(--fg-primary)",
-              }}
-            >
-              {s.value}
+      <div className="relative mx-auto max-w-[1280px] px-4 py-10 sm:px-6 md:px-10 md:py-14">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div className="max-w-[640px]">
+            <h1 className="font-heading text-[28px] leading-tight font-bold text-[#eef0f7] sm:text-[34px]">
+              Locked In
+            </h1>
+            <p className="mt-3 font-body text-[14.5px] leading-relaxed text-muted">
+              Lock USDC for a fixed term. The contract won&apos;t release it
+              before maturity — not to anyone, including LoktIn. Yield accrues
+              from Blend the whole time it&apos;s locked.
             </p>
           </div>
-        ))}
+          <DashButton
+            variant="primary"
+            onClick={() => void navigate("/dashboard/locked/new")}
+            className="w-full shrink-0 px-6 py-3 sm:w-auto"
+          >
+            Create Locked Savings
+          </DashButton>
+        </div>
+
+        {lastError && !unlockTarget && (
+          <p className="mt-8 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 font-body text-[13px] text-red-300">
+            {lastError}
+          </p>
+        )}
+
+        {locks.length > 0 && (
+          <FilterPills
+            options={FILTERS}
+            value={filter}
+            onChange={(f) => {
+              setFilter(f);
+              setPage(1);
+            }}
+          />
+        )}
+
+        {loading ? (
+          <div
+            role="status"
+            aria-label="Loading locks"
+            className="flex justify-center py-24 text-cyan"
+          >
+            <Spinner className="h-8 w-8" />
+          </div>
+        ) : locks.length === 0 ? (
+          <EmptyState onCreate={() => void navigate("/dashboard/locked/new")} />
+        ) : visible.length === 0 ? (
+          <p className="py-24 text-center font-body text-[14.5px] text-muted">
+            No {filter.toLowerCase()} locks.
+          </p>
+        ) : (
+          <>
+            <ul className="mt-8 flex flex-col gap-4">
+              {paged.map((l) => (
+                <LockRow
+                  key={l.id.toString()}
+                  lock={l}
+                  nowSecs={nowSecs}
+                  realNowSecs={realNowSecs}
+                  onUnlock={setUnlockTarget}
+                />
+              ))}
+            </ul>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={visible.length}
+              pageSize={PAGE_SIZE}
+              onChange={setPage}
+            />
+          </>
+        )}
       </div>
 
-      {lastError && (
-        <div
-          style={{
-            border: "1px solid var(--status-error)",
-            borderLeft: "4px solid var(--status-error)",
-            padding: "var(--sp-3) var(--sp-4)",
-            marginBottom: "var(--sp-6)",
-            fontSize: "var(--font-size-sm)",
-          }}
-        >
-          <strong style={{ color: "var(--status-error)" }}>Error:</strong>{" "}
-          <span style={{ color: "var(--fg-secondary)" }}>{lastError}</span>
-        </div>
+      {unlockTarget && (
+        <UnlockModal
+          lock={unlockTarget}
+          submitting={submitting}
+          error={lastError}
+          simulatedOnly={unlockSimulatedOnly}
+          onConfirm={() => void confirmUnlock()}
+          onCancel={() => setUnlockTarget(null)}
+        />
       )}
+    </div>
+  );
+}
 
-      {showCreate && (
-        <div
-          style={{
-            border: "1px solid var(--border-accent)",
-            padding: "var(--sp-8)",
-            marginBottom: "var(--sp-8)",
-            background: "var(--bg-surface)",
-          }}
-        >
-          <p
-            style={{
-              fontSize: "var(--font-size-xs)",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "var(--fg-muted)",
-              marginBottom: "var(--sp-6)",
-            }}
-          >
-            New Lock
-          </p>
+function EmptyState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <div className="flex flex-col items-center py-32 text-center">
+      <img
+        src="/dashboard/element/empty-state.svg"
+        alt=""
+        aria-hidden
+        width={150}
+        height={150}
+        className="select-none"
+      />
 
-          {!pendingLock && (
-            <CreateLockForm
-              onLock={submit}
-              loading={submitting}
-              apyTiers={apyTiers}
-            />
-          )}
-
-          {pendingLock && (
-            <div>
-              <p
-                style={{
-                  fontSize: "var(--font-size-sm)",
-                  marginBottom: "var(--sp-4)",
-                }}
-              >
-                Locking{" "}
-                <strong>
-                  {(Number(pendingLock.amount) / 10_000_000).toFixed(2)} USDC
-                </strong>{" "}
-                for {pendingLock.durationMonths} month
-                {pendingLock.durationMonths !== 1 ? "s" : ""}…
-              </p>
-              <UsdcAllowance
-                spenderContract={LOCKED_VAULT_CONTRACT_ID}
-                requiredAmount={pendingLock.amount}
-                onReady={() => void finishLock()}
-                label="Authorize the Locked Vault contract to transfer your USDC."
-              />
-              <p
-                style={{
-                  fontSize: "var(--font-size-xs)",
-                  color: "var(--fg-muted)",
-                }}
-              >
-                Submitting lock…
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {loading ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "var(--sp-16)",
-            color: "var(--fg-muted)",
-            fontSize: "var(--font-size-sm)",
-          }}
-        >
-          Loading locks…
-        </div>
-      ) : locks.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "var(--sp-16)",
-            border: "1px dashed var(--border)",
-          }}
-        >
-          <p
-            style={{
-              fontSize: "var(--font-size-3xl)",
-              marginBottom: "var(--sp-4)",
-              opacity: 0.3,
-            }}
-          ></p>
-          <p
-            style={{
-              fontSize: "var(--font-size-lg)",
-              fontWeight: 600,
-              marginBottom: "var(--sp-3)",
-            }}
-          >
-            No Locks Yet
-          </p>
-          <p
-            style={{
-              fontSize: "var(--font-size-sm)",
-              color: "var(--fg-muted)",
-              marginBottom: "var(--sp-6)",
-              maxWidth: 480,
-              margin: "0 auto var(--sp-6) auto",
-            }}
-          >
-            Lock USDC for a fixed term (1–12 months) at a tiered APY. No early
-            withdrawal.
-          </p>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => setShowCreate(true)}
-          >
-            Lock First USDC →
-          </Button>
-        </div>
-      ) : (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--sp-4)",
-          }}
-        >
-          {locks.map((l) => (
-            <LockCard key={l.id.toString()} lock={l} onUnlock={unlock} />
-          ))}
-        </div>
-      )}
+      <h2 className="mt-6 font-heading text-[27px] font-bold text-[#eef0f7]">
+        You currently have zero locked funds
+      </h2>
+      <p className="mt-3 font-body text-[14.5px] text-muted">
+        Click on “Create Locked Savings” to create your first locked savings
+      </p>
+      <DashButton
+        variant="primary"
+        onClick={onCreate}
+        className="mt-8 px-6 py-3"
+      >
+        Create Locked Savings
+      </DashButton>
     </div>
   );
 }

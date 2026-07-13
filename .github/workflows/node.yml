@@ -26,25 +26,13 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: rustup target add wasm32v1-none
-      - name: Start Stellar Quickstart
-        uses: stellar/quickstart@main
-        with:
-          tag: testing
-          network: local
       - run: sudo apt-get update && sudo apt-get install -y libudev-dev libdbus-1-dev pkg-config
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@v1.15.6
-      - name: Check for stellar-scaffold binary
-        run: |
-          if ! command -v stellar-scaffold &> /dev/null; then
-            echo "stellar-scaffold not found, installing..."
-            cargo binstall stellar-scaffold-cli
-          else
-            echo "stellar-scaffold already installed. Clear cache to force reinstall."
-          fi
       - run: npm ci
-      - name: Build clients before building the project
-        run: STELLAR_SCAFFOLD_ENV=development stellar-scaffold build --build-clients
+      # The contract client packages (packages/*) are committed to the repo, so we
+      # build them from source rather than regenerating them from a live deploy.
+      # Regenerating requires deploying contracts to a network whose constructors
+      # reference the testnet USDC SAC; that can't run on a throwaway local network.
+      # Bindings are regenerated manually (see packages/*/README.md) when contracts change.
       - run: npm run install:contracts
       # lint + prettier run AFTER the client packages are built: the type-aware
       # ESLint rules (no-unsafe-*) need the generated package types in
