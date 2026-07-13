@@ -92,9 +92,8 @@ export default function Locked() {
               Locked In
             </h1>
             <p className="mt-3 font-body text-[14.5px] leading-relaxed text-muted">
-              Lock USDC for a fixed term. The contract won&apos;t release it
-              before maturity — not to anyone, including LoktIn. Yield accrues
-              from Blend the whole time it&apos;s locked.
+              Lock USDC for a fixed term. Yield accrues from Blend the whole
+              time it&apos;s locked.
             </p>
           </div>
           <DashButton

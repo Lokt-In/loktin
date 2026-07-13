@@ -6,16 +6,16 @@ const COLUMNS = [
     links: [
       { label: "Locked In", href: "#" },
       { label: "Target Savings", href: "#" },
-      { label: "How it works", href: "#how-it-works" },
-      { label: "FAQ", href: "#faq" },
+      // { label: "How it works", href: "#how-it-works" },
+      // { label: "FAQ", href: "#faq" },
     ],
   },
   {
     title: "Resources",
     links: [
-      { label: "Documentation", href: "#" },
-      { label: "Smart contracts", href: "#" },
-      { label: "Security", href: "#" },
+      { label: "Documentation", href: "https://docs.loktin.xyz" },
+      // { label: "Smart contracts", href: "#" },
+      // { label: "Security", href: "#" },
       { label: "Blog", href: "#" },
     ],
   },
@@ -23,7 +23,7 @@ const COLUMNS = [
     title: "Community",
     links: [
       { label: "Twitter / X", href: "#" },
-      { label: "Discord", href: "#" },
+      // { label: "Discord", href: "#" },
       { label: "GitHub", href: "#" },
       { label: "Contact", href: "#" },
     ],
@@ -32,7 +32,7 @@ const COLUMNS = [
 
 const SOCIALS = [
   { name: "Twitter / X", href: "#", icon: "/landing/icons/x.png" },
-  { name: "Discord", href: "#", icon: "/landing/icons/discord.png" },
+  // { name: "Discord", href: "#", icon: "/landing/icons/discord.png" },
   { name: "GitHub", href: "#", icon: "/landing/icons/github.png" },
 ];
 
@@ -60,10 +60,10 @@ export default function Footer() {
             <p className="font-heading text-[22px] font-bold text-white">
               <Wordmark />
             </p>
-            <p className="mt-4 max-w-[320px] font-body text-[14px] leading-[21.7px] text-muted">
+            {/* <p className="mt-4 max-w-[320px] font-body text-[14px] leading-[21.7px] text-muted">
               Savings and investment on Stellar. Smart contracts hold you to
               your own plan, so you don&apos;t have to.
-            </p>
+            </p> */}
           </div>
 
           {COLUMNS.map((col) => (

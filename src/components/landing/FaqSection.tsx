@@ -70,9 +70,9 @@ export default function FaqSection() {
       className="mx-auto max-w-(--max-width) px-5 py-24 md:px-8 lg:py-32"
     >
       <div className="text-center">
-        <span className="inline-flex items-center rounded-full border border-[#ffffff14] bg-surface px-4 py-1.5 font-body text-[13px] font-medium text-subtle">
+        {/* <span className="inline-flex items-center rounded-full border border-[#ffffff14] bg-surface px-4 py-1.5 font-body text-[13px] font-medium text-subtle">
           FAQ
-        </span>
+        </span> */}
         <h2 className="mt-6 font-heading text-[clamp(2rem,5vw,3.25rem)] leading-[1.15] font-bold text-white">
           Frequently Asked Questions
         </h2>

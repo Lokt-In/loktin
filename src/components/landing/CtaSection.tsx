@@ -31,7 +31,7 @@ export default function CtaSection() {
           Ready to Lock in?
         </h2>
         <p className="mx-auto mt-[13px] max-w-[440px] font-body text-[16px] leading-[24.8px] font-normal text-subtle">
-          Connect your Stellar wallet and set your first savings commitment in
+          Connect your Stellar wallet and set up your first savings plan in
           under two minutes.
         </p>
         <div className="mt-8 flex justify-center">

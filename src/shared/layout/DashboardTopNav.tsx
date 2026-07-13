@@ -94,6 +94,44 @@ const LINKS: { to: string; label: string; icon: ReactNode; end?: boolean }[] = [
   { to: "/dashboard/targets", label: "Target Savings", icon: TargetIcon },
 ];
 
+const CalendarIcon = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+    <rect
+      x="2.5"
+      y="3.5"
+      width="11"
+      height="10"
+      rx="2"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
+    <path
+      d="M2.5 6.5h11M5.5 2v2M10.5 2v2"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const CoinsIcon = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+    <circle cx="6" cy="6.5" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+    <path
+      d="M8.7 4.3a3.5 3.5 0 1 1-2.4 6.4"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+// Not yet shipped — shown in the nav as disabled with a small "Soon" tag.
+const COMING_SOON: { label: string; icon: ReactNode }[] = [
+  { label: "Plans", icon: CalendarIcon },
+  { label: "Spend & Save", icon: CoinsIcon },
+];
+
 function NavItems() {
   return (
     <>
@@ -112,6 +150,20 @@ function NavItems() {
             </span>
           )}
         </NavLink>
+      ))}
+      {COMING_SOON.map(({ label, icon }) => (
+        <span
+          key={label}
+          aria-disabled="true"
+          title="Coming soon"
+          className="relative flex shrink-0 cursor-not-allowed items-center gap-2 rounded-lg px-3.5 py-2 font-body text-[14.5px] whitespace-nowrap text-subtle/40"
+        >
+          {icon}
+          {label}
+          <span className="pointer-events-none absolute -top-1 right-0 rounded-full bg-violet-500/20 px-1.5 py-[1px] text-[8px] font-bold tracking-wide text-violet-300 uppercase">
+            Soon
+          </span>
+        </span>
       ))}
     </>
   );
