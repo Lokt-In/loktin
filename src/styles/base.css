@@ -38,6 +38,41 @@
     min-height: 100vh;
   }
 
+  /* The app is dark-only. Without this the UA paints scrollbars (and any
+     remaining native control chrome) from the light palette, which reads as a
+     pale/violet strip against the near-black background. */
+  html {
+    color-scheme: dark;
+  }
+
+  /* Firefox / IE. WebKit needs the pseudo-element below. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: #2c2c33;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #3d3d47;
+  }
+
+  /* Opt-out for rows that scroll horizontally as an overflow affordance (the
+     mobile nav, the filter pills) — the bar itself is visual noise there. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   a {
     color: var(--fg-primary);
     text-decoration: none;

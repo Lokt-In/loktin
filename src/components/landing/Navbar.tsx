@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { connectWallet } from "../../util/wallet";
 import { useWallet } from "../../hooks/useWallet";
+import Wordmark from "../../shared/components/Wordmark";
 
 const NAV_LINKS = [
   { label: "Product", href: "#product" },
@@ -33,7 +34,7 @@ export default function Navbar() {
           href="#top"
           className="shrink-0 font-heading text-[20px] leading-none font-semibold text-white"
         >
-          LoktIn
+          <Wordmark />
         </a>
 
         <ul className="hidden list-none items-center gap-8 md:flex">
