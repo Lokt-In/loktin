@@ -10,7 +10,6 @@ import DashButton from "../../shared/dash/DashButton";
 import Spinner from "../../shared/dash/Spinner";
 import FilterPills from "../../shared/dash/FilterPills";
 import Pagination from "../../shared/dash/Pagination";
-import SimulatedTimeBanner from "../../shared/dash/SimulatedTimeBanner";
 
 const FILTERS = ["All", "Active", "Matured"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -39,10 +38,7 @@ export default function Locked() {
     return () => clearInterval(id);
   }, []);
 
-  // Demo clock. Shifts only what's displayed — `unlock` is still gated on
-  // `realNowSecs`, because the contract compares against the ledger timestamp.
-  const [offsetDays, setOffsetDays] = useState(0);
-  const nowSecs = realNowSecs + offsetDays * 86_400;
+  const nowSecs = realNowSecs;
 
   useEffect(() => {
     if (!address) void navigate("/");
@@ -68,26 +64,6 @@ export default function Locked() {
     [visible, page],
   );
 
-  // Locks that have not yet matured under the *simulated* clock.
-  const pendingLocks = locks.filter(
-    (l) => !l.is_unlocked && Number(l.end_date) > nowSecs,
-  );
-
-  /**
-   * Jump the display clock just past the soonest pending maturity, so a single
-   * click matures a lock. Stepping a literal day at a time would need ~30
-   * clicks to mature even the shortest possible lock (the contract's minimum
-   * term is one 30-day month).
-   */
-  const advanceToNextMaturity = () => {
-    if (pendingLocks.length === 0) return;
-    const soonestEnd = Math.min(...pendingLocks.map((l) => Number(l.end_date)));
-    // +60s so we land strictly past end_date, never exactly on it.
-    const secondsNeeded = soonestEnd - realNowSecs + 60;
-    setOffsetDays(Math.ceil(secondsNeeded / 86_400));
-    setPage(1);
-  };
-
   if (!address) return null;
 
   // True when the open lock reads as matured only under the simulated clock.
@@ -108,16 +84,6 @@ export default function Locked() {
 
   return (
     <div className="relative min-h-[calc(100vh-72px)]">
-      <SimulatedTimeBanner
-        offsetDays={offsetDays}
-        canAdvance={pendingLocks.length > 0}
-        onAdvance={advanceToNextMaturity}
-        onReset={() => {
-          setOffsetDays(0);
-          setPage(1);
-        }}
-      />
-
       {/* Faint grid wash behind the content, per the design. */}
       <div
         aria-hidden
