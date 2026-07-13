@@ -7,7 +7,7 @@ const NAV_LINKS = [
   { label: "Product", href: "#product" },
   { label: "How it works", href: "#how-it-works" },
   { label: "FAQ", href: "#faq" },
-  { label: "Docs", href: "#docs" },
+  { label: "Docs", href: "https://docs.loktin.xyz" },
 ];
 
 /**

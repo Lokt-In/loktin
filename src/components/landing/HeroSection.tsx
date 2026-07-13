@@ -5,11 +5,13 @@ import { useWallet } from "../../hooks/useWallet";
 import LandingButton from "./LandingButton";
 import LockedInCard from "./LockedInCard";
 
+/*
 const STATS = [
   { value: "100%", label: "Non-custodial, always" },
   { value: "0", label: "KYC required" },
   { value: "10%", label: "Fee — on yield only" },
 ];
+*/
 
 /**
  * Landing hero (dark, centered): status pill, headline, copy, CTAs, a stats
@@ -92,34 +94,21 @@ export default function HeroSection() {
       />
       <div className="relative z-10 mx-auto max-w-(--max-width) px-5 py-24 md:px-8 lg:py-32">
         <div className="mx-auto max-w-[820px] text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#ffffff14] bg-[#ffffff0a] px-4 py-1.5 font-body text-[12.5px] leading-[19.38px] font-bold tracking-[0.5px] text-subtle">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            Live on Stellar Testnet
-          </span>
-
-          <h1 className="mt-8 font-heading text-[clamp(2.75rem,7vw,5rem)] leading-[1.05] font-bold text-white">
-            Save on-chain like you{" "}
-            <span className="text-cyan">actually mean it.</span>
+          <h1 className="font-heading text-[clamp(2.75rem,7vw,5rem)] leading-[1.05] font-bold text-white">
+            Save on-chain, <span className="text-cyan">on autopilot.</span>
           </h1>
-
-          <p className="mx-auto mt-6 max-w-[620px] font-body text-[1.125rem] leading-relaxed text-subtle">
-            LoktIn uses Stellar smart contracts to lock in your savings
-            commitments — so willpower isn&apos;t the thing standing between you
-            and your goals. Your USDC earns yield via Blend the whole time, with
-            zero DeFi know-how required.
-          </p>
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
             <LandingButton variant="primary" onClick={handleConnect}>
               {address ? "Open App" : "Connect Wallet"}
             </LandingButton>
             <LandingButton variant="secondary" href="#how-it-works">
-              See how it works
+              How it works
             </LandingButton>
           </div>
         </div>
 
-        <dl className="mx-auto mt-16 grid min-h-[193px] max-w-[900px] grid-cols-3 divide-x divide-[#ffffff14]/30 rounded-2xl border border-[#ffffff14] bg-surface">
+        {/* <dl className="mx-auto mt-16 grid min-h-[193px] max-w-[900px] grid-cols-3 divide-x divide-[#ffffff14]/30 rounded-2xl border border-[#ffffff14] bg-surface">
           {STATS.map((s) => (
             <div
               key={s.label}
@@ -133,7 +122,7 @@ export default function HeroSection() {
               </dd>
             </div>
           ))}
-        </dl>
+        </dl> */}
 
         <div className="mx-auto mt-[64px] max-w-[780px]">
           <LockedInCard />

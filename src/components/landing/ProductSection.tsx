@@ -1,30 +1,29 @@
 const CHECKS = [
-  "Non-custodial — you always hold your own keys",
-  "No KYC, no sign-up forms — just connect and go",
-  "Yield flows in automatically via Blend — no manual staking",
-  "Smart contracts enforce your commitment — not your willpower",
+  "Non-custodial, you always hold your own keys",
+  "No KYC, no sign-up forms, just connect and save",
+  "Yield flows in automatically via Blend",
 ];
 
 const STEPS = [
   {
     n: "1",
     title: "Connect your Stellar wallet",
-    body: "No account creation. Your wallet is your identity.",
+    // body: "No account creation. Your wallet is your identity.",
   },
   {
     n: "2",
     title: "Pick a savings primitive",
-    body: "Lock a fixed amount, or set a target goal with auto-deposits.",
+    // body: "Lock a fixed amount, or set a target goal with auto-deposits.",
   },
   {
     n: "3",
     title: "Your USDC earns yield via Blend",
-    body: "Idle funds are routed automatically — no action needed.",
+    // body: "Idle funds are routed automatically — no action needed.",
   },
   {
     n: "4",
     title: "Withdraw on your terms",
-    body: "At maturity, or early with a small, transparent fee.",
+    // body: "At maturity, or early with a small, transparent fee.",
   },
 ];
 
@@ -54,25 +53,22 @@ export default function ProductSection() {
   return (
     <section className="mx-auto max-w-(--max-width) px-5 py-24 md:px-8 lg:py-32">
       <div className="text-center">
-        <span className="inline-flex items-center rounded-full border border-[#ffffff14] bg-surface px-4 py-1.5 font-body text-[13px] font-medium text-subtle">
+        {/* <span className="inline-flex items-center rounded-full border border-[#ffffff14] bg-surface px-4 py-1.5 font-body text-[13px] font-medium text-subtle">
           The Product
-        </span>
+        </span> */}
         <h2 className="mx-auto mt-6 max-w-[860px] font-heading text-[clamp(2rem,5vw,3.25rem)] leading-[1.2] font-bold text-white">
-          Crypto savings that feels like the app you already use
+          Earn yield on your USDC{" "}
+          <span className="text-cyan">effortlessly</span>.
         </h2>
       </div>
 
       <div className="mt-16 grid grid-cols-1 gap-12 lg:grid-cols-2 lg:items-start lg:gap-16">
         <div>
           <h3 className="font-heading text-[clamp(1.5rem,3vw,2.25rem)] leading-[1.2] font-bold text-white">
-            Built for people who <span className="text-cyan">hold crypto</span>,
-            not DeFi power users
+            <span className="text-cyan">Anyone</span> can save on-chain
           </h3>
           <p className="mt-5 max-w-[520px] font-body text-[1rem] leading-relaxed text-subtle">
-            If you already know your way around a wallet — but staking, lending
-            pools, and impermanent loss aren&apos;t your thing — LoktIn is built
-            for you. We hide the DeFi complexity behind a familiar, Web2-style
-            savings experience.
+            As easy as your banking app, minus the bank.
           </p>
           <ul className="mt-8 space-y-4">
             {CHECKS.map((c) => (
@@ -102,9 +98,9 @@ export default function ProductSection() {
                 <h4 className="font-heading text-[1.0625rem] leading-snug font-semibold text-white">
                   {step.title}
                 </h4>
-                <p className="mt-1 font-body text-[0.9rem] leading-relaxed text-muted">
+                {/* <p className="mt-1 font-body text-[0.9rem] leading-relaxed text-muted">
                   {step.body}
-                </p>
+                </p> */}
               </div>
             </div>
           ))}

@@ -18,7 +18,7 @@ export default function LockedInCard() {
           Locked In · 6 months
         </p>
         <span className="rounded-full border border-[#34E0A14D] bg-[#34E0A124] px-3 py-1 font-body text-[12px] leading-[18.6px] font-bold text-[#34E0A1]">
-          8.4% APY
+          10.4% APY
         </span>
       </div>
 
@@ -35,7 +35,7 @@ export default function LockedInCard() {
           Projected yield
         </span>
         <span className="font-body text-[14.5px] leading-[22.48px] font-bold text-cyan">
-          +42.10 USDC
+          +104 USDC
         </span>
       </div>
 
