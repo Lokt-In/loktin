@@ -1,6 +1,6 @@
 import type { TargetGoal } from "../hooks/useTargets";
 import { forfeitAmount, isEarlyWithdrawal } from "../lib/targetMath";
-import { formatUsdcAdaptive, formatDate } from "../../../shared/lib/money";
+import { formatUsdcAdaptive } from "../../../shared/lib/money";
 import DashModal from "../../../shared/dash/DashModal";
 import DashButton from "../../../shared/dash/DashButton";
 import Spinner from "../../../shared/dash/Spinner";
@@ -9,10 +9,7 @@ interface Props {
   goal: TargetGoal;
   /** Live yield from `get_goal_yield`; null while loading. */
   goalYield: bigint | null;
-  /** True wall clock. Every figure here is computed from this, never the simulated clock. */
-  realNowSecs: number;
-  /** Goal reads as matured only because the display clock was fast-forwarded. */
-  simulatedOnly: boolean;
+  nowSecs: number;
   submitting: boolean;
   error: string | null;
   onConfirm: () => void;
@@ -24,16 +21,11 @@ interface Props {
  * and closes the goal. The 1% forfeit applies only before the deadline; yield
  * is never forfeited, so it gets its own line either way — the design omits it,
  * but leaving it out would understate what actually lands in the wallet.
- *
- * Everything is computed from the *real* clock. `withdraw` doesn't revert early,
- * it just deducts — so pricing this off a fast-forwarded clock would hide a real
- * 1% loss behind a "Matured" badge.
  */
 export default function WithdrawModal({
   goal,
   goalYield,
-  realNowSecs,
-  simulatedOnly,
+  nowSecs,
   submitting,
   error,
   onConfirm,
@@ -42,16 +34,8 @@ export default function WithdrawModal({
   const loadingYield = goalYield === null;
   const earned = goalYield ?? 0n;
 
-  // What the *real* contract would charge right now. Always computed, because
-  // it's what the simulated-time notice has to disclose.
-  const realForfeit = forfeitAmount(goal, realNowSecs);
-
-  // Under simulation the row previews the matured state, so the breakdown has
-  // to match it: this is what you'd receive *at* maturity, with no forfeit.
-  // Confirm is disabled in that state, so nothing can be withdrawn against
-  // these figures — and the notice below still spells out today's real cost.
-  const early = !simulatedOnly && isEarlyWithdrawal(goal, realNowSecs);
-  const forfeit = early ? realForfeit : 0n;
+  const early = isEarlyWithdrawal(goal, nowSecs);
+  const forfeit = early ? forfeitAmount(goal, nowSecs) : 0n;
   const receive = goal.deposited - forfeit + earned;
 
   return (
@@ -63,11 +47,9 @@ export default function WithdrawModal({
         {early ? "Withdraw early" : "Withdraw"}
       </h2>
       <p className="mt-2 text-center font-body text-[14.5px] text-muted">
-        {simulatedOnly
-          ? "Preview at maturity, under the simulated clock."
-          : early
-            ? "This goal hasn't reached its deadline. Here's your payout breakdown."
-            : "This goal has reached its deadline. Here's your payout breakdown."}
+        {early
+          ? "This goal hasn't reached its deadline. Here's your payout breakdown."
+          : "This goal has reached its deadline. Here's your payout breakdown."}
       </p>
 
       <dl className="mt-7 rounded-xl border border-[#ffffff14] bg-[#ffffff0a] px-6 py-2">
@@ -108,16 +90,7 @@ export default function WithdrawModal({
         </div>
       </dl>
 
-      {simulatedOnly && (
-        <p className="mt-4 rounded-lg border border-cyan/25 bg-cyan/[0.06] px-4 py-3 font-body text-[13px] text-subtle">
-          These are the figures at maturity, on {formatDate(goal.end_date)}. The
-          contract goes by the ledger, not the simulated clock — withdrawing
-          today would forfeit {formatUsdcAdaptive(realForfeit)} USDC (1%). Reset
-          the clock to do that deliberately.
-        </p>
-      )}
-
-      {early && !simulatedOnly && (
+      {early && (
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/[0.06] px-4 py-3 font-body text-[13px] text-red-300">
           Withdrawing now forfeits 1% of what you&apos;ve saved and closes the
           goal for good. It can&apos;t be resumed.
@@ -134,15 +107,7 @@ export default function WithdrawModal({
         <DashButton
           variant={early ? "danger" : "primary"}
           loading={submitting}
-          // Blocked under simulation: `withdraw` would succeed and quietly take
-          // the 1% the badge says isn't owed. Reset the clock to withdraw early
-          // deliberately.
-          disabled={loadingYield || simulatedOnly}
-          title={
-            simulatedOnly
-              ? `Preview only — reset the simulated clock to withdraw early.`
-              : undefined
-          }
+          disabled={loadingYield}
           onClick={onConfirm}
           className="w-full py-3.5"
         >

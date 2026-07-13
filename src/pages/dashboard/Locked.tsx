@@ -27,18 +27,14 @@ export default function Locked() {
 
   // Recompute maturity on a timer: a lock can cross its end_date while the page
   // is open, and nothing else would re-render the row.
-  const [realNowSecs, setRealNowSecs] = useState(() =>
-    Math.floor(Date.now() / 1000),
-  );
+  const [nowSecs, setNowSecs] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
     const id = setInterval(
-      () => setRealNowSecs(Math.floor(Date.now() / 1000)),
+      () => setNowSecs(Math.floor(Date.now() / 1000)),
       30_000,
     );
     return () => clearInterval(id);
   }, []);
-
-  const nowSecs = realNowSecs;
 
   useEffect(() => {
     if (!address) void navigate("/");
@@ -66,15 +62,8 @@ export default function Locked() {
 
   if (!address) return null;
 
-  // True when the open lock reads as matured only under the simulated clock.
-  const unlockSimulatedOnly =
-    unlockTarget !== null && realNowSecs < Number(unlockTarget.end_date);
-
   const confirmUnlock = async () => {
     if (!unlockTarget) return;
-    // The button is disabled in this state; guard anyway so no code path can
-    // submit an unlock the contract would reject with LockNotMatured.
-    if (realNowSecs < Number(unlockTarget.end_date)) return;
     const payout = await unlock(unlockTarget.id);
     if (payout !== null) {
       setUnlockTarget(null);
@@ -155,7 +144,6 @@ export default function Locked() {
                   key={l.id.toString()}
                   lock={l}
                   nowSecs={nowSecs}
-                  realNowSecs={realNowSecs}
                   onUnlock={setUnlockTarget}
                 />
               ))}
@@ -176,7 +164,6 @@ export default function Locked() {
           lock={unlockTarget}
           submitting={submitting}
           error={lastError}
-          simulatedOnly={unlockSimulatedOnly}
           onConfirm={() => void confirmUnlock()}
           onCancel={() => setUnlockTarget(null)}
         />
