@@ -21,27 +21,13 @@ const STATUS_LABELS = {
 
 interface Props {
   lock: Lock;
-  /** Display clock — may be shifted forward by the time-simulation banner. */
   nowSecs: number;
-  /** True wall clock. Gates unlocking, which the contract checks against the ledger. */
-  realNowSecs: number;
   onUnlock: (lock: Lock) => void;
 }
 
-export default function LockRow({
-  lock,
-  nowSecs,
-  realNowSecs,
-  onUnlock,
-}: Props) {
+export default function LockRow({ lock, nowSecs, onUnlock }: Props) {
   const status = lockStatus(lock, nowSecs);
   const months = lockMonths(lock);
-
-  // A lock can read as matured under the simulated clock while the contract
-  // still rejects `unlock` with LockNotMatured. Only offer the button when the
-  // lock has really matured; otherwise show it disabled with the real date.
-  const reallyMatured = realNowSecs >= Number(lock.end_date);
-  const simulatedOnly = status === "matured" && !reallyMatured;
 
   return (
     <li className="flex flex-col gap-4 rounded-2xl border border-[#ffffff14] bg-[#101116] p-5 sm:flex-row sm:items-center sm:gap-6">
@@ -118,17 +104,9 @@ export default function LockRow({
 
       <div className="shrink-0">
         {status === "matured" ? (
-          // Clickable even under simulated time: the modal is a read-only
-          // payout breakdown. It's the Confirm inside it that would fire a tx
-          // the contract rejects, so that's where the real-time gate lives.
           <DashButton
             variant="primary"
             onClick={() => onUnlock(lock)}
-            title={
-              simulatedOnly
-                ? `Simulated — the contract unlocks this on ${formatDateShort(lock.end_date)}.`
-                : undefined
-            }
             className="w-full sm:w-auto"
           >
             Unlock Now

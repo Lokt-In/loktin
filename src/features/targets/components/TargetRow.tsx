@@ -29,10 +29,7 @@ const STATUS_LABELS: Record<TargetStatus, string> = {
 
 interface Props {
   goal: TargetGoal;
-  /** Display clock — may be shifted forward by the time-simulation banner. */
   nowSecs: number;
-  /** True wall clock. Decides whether a withdrawal really forfeits 1%. */
-  realNowSecs: number;
   onTopUp: (goal: TargetGoal) => void;
   onWithdraw: (goal: TargetGoal) => void;
 }
@@ -100,7 +97,6 @@ function WithdrawnRow({ goal }: { goal: TargetGoal }) {
 export default function TargetRow({
   goal,
   nowSecs,
-  realNowSecs,
   onTopUp,
   onWithdraw,
 }: Props) {
@@ -110,18 +106,10 @@ export default function TargetRow({
   const pct = progressPct(goal);
   const matured = status === "matured";
 
-  // "Matured" can mean two different things, and they need different buttons.
-  //
-  // Fast-forwarded time: the row previews the matured state, and Confirm is
-  // blocked inside the modal, so nothing can actually be forfeited from here.
-  // Show the normal Withdraw Now, same as a simulated-matured lock does.
-  //
-  // Fully funded before the deadline: matured on *both* clocks and genuinely
-  // actionable — but `withdraw` still takes 1%, since the forfeit keys off
-  // `end_date` alone. That one has to read "Withdraw early".
-  const simulatedOnly =
-    matured && targetStatus(goal, realNowSecs) !== "matured";
-  const early = !simulatedOnly && isEarlyWithdrawal(goal, realNowSecs);
+  // A goal reaches its target before the deadline still forfeits 1% on
+  // withdrawal — the forfeit keys off `end_date`, not how full the goal is — so
+  // that case reads "Withdraw early" rather than "Withdraw Now".
+  const early = isEarlyWithdrawal(goal, nowSecs);
 
   return (
     <li className="flex flex-col gap-4 rounded-2xl border border-[#ffffff14] bg-[#101116] p-5 sm:flex-row sm:items-center sm:gap-6">
@@ -179,11 +167,9 @@ export default function TargetRow({
             variant={early ? "danger" : "primary"}
             onClick={() => onWithdraw(goal)}
             title={
-              simulatedOnly
-                ? `Simulated — the contract still charges the 1% forfeit until ${formatDateShort(goal.end_date)}.`
-                : early
-                  ? `The contract charges the 1% forfeit until ${formatDateShort(goal.end_date)}.`
-                  : undefined
+              early
+                ? `The contract charges the 1% forfeit until ${formatDateShort(goal.end_date)}.`
+                : undefined
             }
             className="w-full sm:w-auto"
           >

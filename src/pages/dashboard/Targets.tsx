@@ -56,18 +56,14 @@ export default function Targets() {
 
   // A goal can cross its deadline while the page is open; nothing else would
   // re-render the row.
-  const [realNowSecs, setRealNowSecs] = useState(() =>
-    Math.floor(Date.now() / 1000),
-  );
+  const [nowSecs, setNowSecs] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
     const id = setInterval(
-      () => setRealNowSecs(Math.floor(Date.now() / 1000)),
+      () => setNowSecs(Math.floor(Date.now() / 1000)),
       30_000,
     );
     return () => clearInterval(id);
   }, []);
-
-  const nowSecs = realNowSecs;
 
   useEffect(() => {
     if (!address) void navigate("/");
@@ -107,13 +103,6 @@ export default function Targets() {
 
   if (!address) return null;
 
-  // True only when the fast-forward is what makes the goal read as matured. A
-  // fully funded goal is matured on both clocks, so it stays withdrawable.
-  const withdrawSimulatedOnly =
-    withdrawTarget !== null &&
-    targetStatus(withdrawTarget, nowSecs) === "matured" &&
-    targetStatus(withdrawTarget, realNowSecs) !== "matured";
-
   const confirmTopUp = async (amount: bigint) => {
     if (!topUpTarget) return;
     const ok = await manualDeposit(topUpTarget.id, amount);
@@ -125,9 +114,6 @@ export default function Targets() {
 
   const confirmWithdraw = async () => {
     if (!withdrawTarget) return;
-    // The button is disabled in this state; guard anyway so the simulated clock
-    // can never trigger a withdrawal that silently forfeits 1%.
-    if (withdrawSimulatedOnly) return;
     const payout = await withdraw(withdrawTarget.id);
     if (payout !== null) {
       setWithdrawTarget(null);
@@ -210,7 +196,6 @@ export default function Targets() {
                   key={g.id.toString()}
                   goal={g}
                   nowSecs={nowSecs}
-                  realNowSecs={realNowSecs}
                   onTopUp={setTopUpTarget}
                   onWithdraw={openWithdraw}
                 />
@@ -243,8 +228,7 @@ export default function Targets() {
         <WithdrawModal
           goal={withdrawTarget}
           goalYield={goalYield}
-          realNowSecs={realNowSecs}
-          simulatedOnly={withdrawSimulatedOnly}
+          nowSecs={nowSecs}
           submitting={submitting}
           error={lastError}
           onConfirm={() => void confirmWithdraw()}
