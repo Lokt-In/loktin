@@ -98,7 +98,7 @@ export default function Overview() {
           />
         </div>
 
-        {/* Coming soon */}
+        {/* Coming soon cards moved to the top nav (Plans / Spend & Save):
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <ComingSoon
             title="Plans"
@@ -108,7 +108,7 @@ export default function Overview() {
             title="Spend & Save"
             body="Automatically routes a set percentage of every spend into a side vault — a round-up style habit for building savings passively."
           />
-        </div>
+        </div> */}
 
         {/* Activity + CTAs */}
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -158,7 +158,7 @@ export default function Overview() {
           <div className="flex flex-col gap-4">
             <CtaCard
               title="New Lock"
-              body="Lock USDC for a fixed term. The contract won't release it before maturity — not to anyone, including LoktIn. Yield accrues from Blend the whole time it's locked."
+              body="Lock USDC for a fixed term. Yield accrues from Blend the whole time it's locked."
               cta="Create Locked Savings"
               onClick={() => void navigate("/dashboard/locked/new")}
             />
@@ -202,6 +202,7 @@ function StatTile({
   );
 }
 
+/* Moved to the top nav; kept for reference.
 function ComingSoon({ title, body }: { title: string; body: string }) {
   return (
     <div className="rounded-2xl border border-[#FFFFFF24] bg-[#101116] p-6">
@@ -219,6 +220,7 @@ function ComingSoon({ title, body }: { title: string; body: string }) {
     </div>
   );
 }
+*/
 
 function CtaCard({
   title,
