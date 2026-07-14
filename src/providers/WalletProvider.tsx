@@ -1,12 +1,13 @@
 import {
   createContext,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   useTransition,
 } from "react";
-import { wallet } from "../util/wallet";
+import { wallet, disconnectWallet } from "../util/wallet";
 import storage from "../util/storage";
 
 export interface WalletContextType {
@@ -16,6 +17,8 @@ export interface WalletContextType {
   isPending: boolean;
   signTransaction?: typeof wallet.signTransaction;
   signAuthEntry?: typeof wallet.signAuthEntry;
+  /** Explicitly sign out: disconnect the kit, clear storage, reset state. */
+  disconnect?: () => Promise<void>;
 }
 
 const initialState = {
@@ -61,130 +64,118 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     useState<Omit<WalletContextType, "isPending">>(restoreState);
   const [isPending, startTransition] = useTransition();
   const popupLock = useRef(false);
-  const signTransaction = wallet.signTransaction.bind(wallet);
-  const signAuthEntry = wallet.signAuthEntry.bind(wallet);
 
-  const nullify = () => {
-    updateState(initialState);
-    storage.setItem("walletId", "");
+  // Bind the signers once. Re-binding every render gave them new identities,
+  // which changed the context value every render and re-ran every consumer.
+  const signers = useRef({
+    signTransaction: wallet.signTransaction.bind(wallet),
+    signAuthEntry: wallet.signAuthEntry.bind(wallet),
+  });
+
+  // Latest committed state, readable inside the poll without making the poll
+  // effect depend on `state` (which would tear it down and restart it on every
+  // change).
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const updateState = useCallback(
+    (newState: Omit<WalletContextType, "isPending">) => {
+      setState((prev) => {
+        if (
+          prev.address !== newState.address ||
+          prev.network !== newState.network ||
+          prev.networkPassphrase !== newState.networkPassphrase
+        ) {
+          return newState;
+        }
+        return prev;
+      });
+    },
+    [],
+  );
+
+  const disconnect = useCallback(async () => {
+    try {
+      await disconnectWallet();
+    } catch (e) {
+      // Even if the kit call fails, we still clear our own session below.
+      console.error("disconnect:", e);
+    }
     storage.setItem("walletAddress", "");
     storage.setItem("walletNetwork", "");
     storage.setItem("networkPassphrase", "");
-  };
+    updateState(initialState);
+  }, [updateState]);
 
-  const updateState = (newState: Omit<WalletContextType, "isPending">) => {
-    setState((prev: Omit<WalletContextType, "isPending">) => {
-      if (
-        prev.address !== newState.address ||
-        prev.network !== newState.network ||
-        prev.networkPassphrase !== newState.networkPassphrase
-      ) {
-        return newState;
-      }
-      return prev;
-    });
-  };
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let isMounted = true;
 
-  const updateCurrentWalletState = async () => {
-    // There is no way, with StellarWalletsKit, to check if the wallet is
-    // installed/connected/authorized. We need to manage that on our side by
-    // checking our storage item.
-    const walletId = storage.getItem("walletId");
-    const walletNetwork = storage.getItem("walletNetwork");
-    const walletAddr = storage.getItem("walletAddress");
-    const passphrase = storage.getItem("networkPassphrase");
-
-    if (
-      !state.address &&
-      walletAddr !== null &&
-      walletNetwork !== null &&
-      passphrase !== null
-    ) {
-      updateState({
-        address: walletAddr,
-        network: walletNetwork,
-        networkPassphrase: passphrase,
-      });
-    }
-
-    if (!walletId) {
-      nullify();
-    } else {
-      if (popupLock.current) return;
-      // If our storage item is there, then we try to get the user's address &
-      // network from their wallet. Note: `getAddress` MAY open their wallet
-      // extension, depending on which wallet they select!
+    // Reconcile our session with the wallet extension. This only *detects
+    // changes* (account/network switches) — it must never sign the user out on
+    // a transient error. A background `getAddress()` throws for all sorts of
+    // reasons (extension asleep, locked, slow), and wiping the session on that
+    // reset every address-keyed read (balance, locks, goals, activity) to zero
+    // as the user navigated. Sign-out is now explicit only (see `disconnect`).
+    const reconcile = async () => {
+      const walletId = storage.getItem("walletId");
+      if (!walletId || popupLock.current) return;
       try {
         popupLock.current = true;
         wallet.setWallet(walletId);
-        if (walletId !== "freighter" && walletAddr !== null) return;
+        // Non-freighter wallets don't support silent background reads; trust the
+        // stored address until the user acts.
+        if (walletId !== "freighter" && stateRef.current.address) return;
         const [a, n] = await Promise.all([
           wallet.getAddress(),
           wallet.getNetwork(),
         ]);
-
-        if (!a.address) storage.setItem("walletId", "");
+        if (!a.address) return; // inconclusive — keep the current session
+        const cur = stateRef.current;
         if (
-          a.address !== state.address ||
-          n.network !== state.network ||
-          n.networkPassphrase !== state.networkPassphrase
+          a.address !== cur.address ||
+          n.network !== cur.network ||
+          n.networkPassphrase !== cur.networkPassphrase
         ) {
           storage.setItem("walletAddress", a.address);
+          storage.setItem("walletNetwork", n.network);
+          storage.setItem("networkPassphrase", n.networkPassphrase);
           updateState({ ...a, ...n });
         }
       } catch (e) {
-        // If `getNetwork` or `getAddress` throw errors... sign the user out???
-        nullify();
-        // then log the error (instead of throwing) so we have visibility
-        // into the error while working on Scaffold Stellar but we do not
-        // crash the app process
-        console.error(e);
+        // Keep the current session; a poll hiccup is not a disconnect.
+        console.error("wallet reconcile:", e);
       } finally {
         popupLock.current = false;
       }
-    }
-  };
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    let isMounted = true;
-
-    // Create recursive polling function to check wallet state continuously
-    const pollWalletState = async () => {
-      if (!isMounted) return;
-
-      await updateCurrentWalletState();
-
-      if (isMounted) {
-        timer = setTimeout(() => void pollWalletState(), POLL_INTERVAL);
-      }
     };
 
-    // Get the wallet address when the component is mounted for the first time
-    startTransition(async () => {
-      await updateCurrentWalletState();
-      // Start polling after initial state is loaded
+    const poll = async () => {
+      if (!isMounted) return;
+      await reconcile();
+      if (isMounted) timer = setTimeout(() => void poll(), POLL_INTERVAL);
+    };
 
-      if (isMounted) {
-        timer = setTimeout(() => void pollWalletState(), POLL_INTERVAL);
-      }
+    startTransition(async () => {
+      await reconcile();
+      if (isMounted) timer = setTimeout(() => void poll(), POLL_INTERVAL);
     });
 
-    // Clear the timeout and stop polling when the component unmounts
     return () => {
       isMounted = false;
       if (timer) clearTimeout(timer);
     };
-  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps -- it SHOULD only run once per component mount
+  }, [updateState]);
 
   const contextValue = useMemo(
     () => ({
       ...state,
       isPending,
-      signTransaction,
-      signAuthEntry,
+      signTransaction: signers.current.signTransaction,
+      signAuthEntry: signers.current.signAuthEntry,
+      disconnect,
     }),
-    [state, isPending, signTransaction, signAuthEntry],
+    [state, isPending, disconnect],
   );
 
   return <WalletContext value={contextValue}>{children}</WalletContext>;
