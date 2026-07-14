@@ -17,9 +17,10 @@ export default function Overview() {
   const { address } = useWallet();
   const navigate = useNavigate();
   const { formatted: balanceFormatted, loading: balLoading } = useUsdcBalance();
-  const { locks } = useLocks();
-  const { goals } = useTargets();
-  const { activity, loading: actLoading } = useActivity(goals);
+  const { locks, loading: locksLoading } = useLocks();
+  const { goals, loading: goalsLoading } = useTargets();
+  const { activity } = useActivity(locks, goals);
+  const actLoading = locksLoading || goalsLoading;
 
   const [nowSecs, setNowSecs] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
