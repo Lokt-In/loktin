@@ -1,19 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { rpc as StellarRpc, scValToNative } from "@stellar/stellar-sdk";
-import * as LockedIn from "locked_in";
-import * as TargetSavings from "target_savings";
-import { rpcUrl } from "../../../contracts/util";
-import { useWallet } from "../../../hooks/useWallet";
+import { useMemo } from "react";
 import { formatUsdcAdaptive } from "../../../shared/lib/money";
+import type { Lock } from "../../locked/hooks/useLocks";
 import type { TargetGoal } from "../../targets/hooks/useTargets";
-
-const LOCKED_ID = LockedIn.networks.testnet.contractId;
-const TARGET_ID = TargetSavings.networks.testnet.contractId;
-
-// Soroban RPC only retains a recent ledger window. ~1 day at ~5s/ledger keeps
-// the query fast and well inside retention; activity older than this simply
-// isn't available to read, so the feed is honestly "recent" only.
-const LOOKBACK_LEDGERS = 17_280;
 
 export type ActivityKind =
   | "lock"
@@ -29,153 +17,62 @@ export interface Activity {
   kind: ActivityKind;
   title: string;
   detail: string;
-  /** Ledger close time, unix seconds. */
+  /** Unix seconds; used to sort and render a relative time. */
   at: number;
 }
 
-// Event amounts arrive as bigint via scValToNative; guard the type since it's
-// typed `unknown`. Adaptive so a sub-cent amount doesn't read as 0.00.
-const fmt = (n: unknown) => formatUsdcAdaptive(typeof n === "bigint" ? n : 0n);
+const fmt = (n: bigint) => formatUsdcAdaptive(n);
 
 /**
- * Recent on-chain activity for the connected wallet, read from contract events.
+ * Recent account activity for the dashboard, derived from the locks and goals
+ * already loaded for the connected wallet.
  *
- * `getEvents` can't filter on event *data*, only on contract + topics, so we
- * pull both contracts' events over the retention window and drop anything whose
- * `user` field isn't the connected address. Target events carry only an id, so
- * goal names are joined in from already-loaded goals.
+ * The event-log approach doesn't work here: the deployed Locked In / Target
+ * Savings contracts don't emit their own domain events. The only contract event
+ * per transaction is the USDC SAC's `transfer`, so `getEvents` filtered on our
+ * contracts reads back empty and the feed never populates. Instead we
+ * reconstruct the feed from on-chain state, which carries the timestamps we
+ * need (`start_date`, `last_deposit_date`). If the contracts later emit events,
+ * this can move back to a `getEvents` feed for richer, per-action history.
  */
-export function useActivity(goals: TargetGoal[]) {
-  const { address } = useWallet();
-  const [activity, setActivity] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(false);
+export function useActivity(locks: Lock[], goals: TargetGoal[]) {
+  const activity = useMemo<Activity[]>(() => {
+    const out: Activity[] = [];
 
-  const load = useCallback(async () => {
-    if (!address) {
-      setActivity([]);
-      return;
+    for (const l of locks) {
+      out.push({
+        id: `lock-${l.id}`,
+        kind: "lock",
+        title: "Lock created",
+        detail: `${fmt(l.amount)} USDC locked`,
+        at: Number(l.start_date),
+      });
     }
-    setLoading(true);
-    try {
-      const server = new StellarRpc.Server(rpcUrl, {
-        allowHttp: rpcUrl.startsWith("http://"),
+
+    for (const g of goals) {
+      out.push({
+        id: `goal-${g.id}`,
+        kind: "goal-created",
+        title: "Goal created",
+        detail: g.name ? `Goal · ${g.name}` : "New savings goal",
+        at: Number(g.start_date),
       });
-      const latest = (await server.getLatestLedger()).sequence;
-      const startLedger = Math.max(1, latest - LOOKBACK_LEDGERS);
-
-      const res = await server.getEvents({
-        startLedger,
-        filters: [{ type: "contract", contractIds: [LOCKED_ID, TARGET_ID] }],
-        limit: 200,
-      });
-
-      const goalName = (id: unknown) =>
-        goals.find((g) => g.id === BigInt(Number(id ?? -1)))?.name;
-
-      const out: Activity[] = [];
-      for (const e of res.events) {
-        let name: string;
-        let data: Record<string, unknown>;
-        try {
-          name = String(scValToNative(e.topic[0]));
-          data = scValToNative(e.value) as Record<string, unknown>;
-        } catch {
-          continue; // undecodable event — skip rather than guess
-        }
-        // scValToNative decodes an ScAddress to its G... string. Guard the type
-        // so a malformed event can't stringify to "[object Object]" and slip the
-        // owner check.
-        if (typeof data.user !== "string" || data.user !== address) continue;
-
-        const at = Math.floor(new Date(e.ledgerClosedAt).getTime() / 1000);
-        const base = { id: `${e.id}`, at };
-
-        switch (name) {
-          case "locked":
-            out.push({
-              ...base,
-              kind: "lock",
-              title: "Lock created",
-              detail: `${fmt(data.amount)} USDC locked`,
-            });
-            break;
-          case "unlocked":
-            out.push({
-              ...base,
-              kind: "unlock",
-              title: "Lock unlocked",
-              detail: `${fmt(data.payout)} USDC to wallet`,
-            });
-            break;
-          case "target_created": {
-            const n = goalName(data.target_id);
-            out.push({
-              ...base,
-              kind: "goal-created",
-              title: "Goal created",
-              detail: n ? `Goal · ${n}` : "New savings goal",
-            });
-            break;
-          }
-          case "manual_deposit": {
-            const n = goalName(data.target_id);
-            out.push({
-              ...base,
-              kind: "top-up",
-              title: "Manual top-up",
-              detail: `${fmt(data.amount)} USDC${n ? ` · ${n}` : ""}`,
-            });
-            break;
-          }
-          case "period_deposit": {
-            const n = goalName(data.target_id);
-            out.push({
-              ...base,
-              kind: "period-deposit",
-              title: "Auto-deposit",
-              detail: `${fmt(data.amount)} USDC${n ? ` · ${n}` : ""}`,
-            });
-            break;
-          }
-          case "withdrawn": {
-            const n = goalName(data.target_id);
-            out.push({
-              ...base,
-              kind: "withdraw",
-              title: "Goal withdrawn",
-              detail: `${fmt(data.to_user)} USDC to wallet${n ? ` · ${n}` : ""}`,
-            });
-            break;
-          }
-          case "missed": {
-            const n = goalName(data.target_id);
-            out.push({
-              ...base,
-              kind: "missed",
-              title: "Deposit missed",
-              detail: n ? `Insufficient funds · ${n}` : "Insufficient funds",
-            });
-            break;
-          }
-          default:
-            break; // admin / blend / config events aren't user activity
-        }
+      // A deposit that landed after creation: surface the running total at the
+      // time of the most recent deposit. Guarded so a goal that has only been
+      // created doesn't show a phantom deposit row.
+      if (g.deposited > 0n && g.last_deposit_date > g.start_date) {
+        out.push({
+          id: `goal-dep-${g.id}`,
+          kind: "top-up",
+          title: "Deposit",
+          detail: `${fmt(g.deposited)} USDC saved${g.name ? ` · ${g.name}` : ""}`,
+          at: Number(g.last_deposit_date),
+        });
       }
-
-      out.sort((a, b) => b.at - a.at);
-      setActivity(out);
-    } catch (e) {
-      // Non-fatal: the panel shows an empty state rather than blocking the page.
-      console.error("useActivity:", e);
-      setActivity([]);
-    } finally {
-      setLoading(false);
     }
-  }, [address, goals]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+    return out.sort((a, b) => b.at - a.at);
+  }, [locks, goals]);
 
-  return { activity, loading, reload: load };
+  return { activity };
 }
