@@ -441,7 +441,7 @@ impl TargetSavings {
         next
     }
 
-    fn token_client(env: &Env) -> token::TokenClient {
+    fn token_client(env: &Env) -> token::TokenClient<'_> {
         let token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
         token::TokenClient::new(env, &token)
     }

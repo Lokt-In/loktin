@@ -134,8 +134,14 @@ export function useUsdcAllowance({
         .build();
 
       const prepared = await server.prepareTransaction(tx);
+      // Name the signing account explicitly. Without `address` the wallet signs
+      // with whatever account happens to be selected in the extension, which
+      // produces a signature that doesn't match the tx source and gets rejected
+      // as a bare "Request failed with status code 400". Same fix as #23 applied
+      // to the trustline.
       const signed = await signTransaction(prepared.toXDR(), {
         networkPassphrase: NETWORK_PASSPHRASE,
+        address,
       });
       const signedXdr =
         typeof signed === "string" ? signed : signed.signedTxXdr;
