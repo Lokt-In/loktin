@@ -6,6 +6,7 @@ import { useUsdcBalance } from "../../hooks/useUsdcBalance";
 import { lockStatus } from "../../features/locked/lib/lockMath";
 import LockRow from "../../features/locked/components/LockRow";
 import UnlockModal from "../../features/locked/components/UnlockModal";
+import LockPlanModal from "../../features/locked/components/LockPlanModal";
 import DashButton from "../../shared/dash/DashButton";
 import Spinner from "../../shared/dash/Spinner";
 import FilterPills from "../../shared/dash/FilterPills";
@@ -24,6 +25,7 @@ export default function Locked() {
   const [filter, setFilter] = useState<Filter>("All");
   const [page, setPage] = useState(1);
   const [unlockTarget, setUnlockTarget] = useState<Lock | null>(null);
+  const [planTarget, setPlanTarget] = useState<Lock | null>(null);
 
   // Recompute maturity on a timer: a lock can cross its end_date while the page
   // is open, and nothing else would re-render the row.
@@ -145,6 +147,7 @@ export default function Locked() {
                   lock={l}
                   nowSecs={nowSecs}
                   onUnlock={setUnlockTarget}
+                  onViewPlan={setPlanTarget}
                 />
               ))}
             </ul>
@@ -167,6 +170,10 @@ export default function Locked() {
           onConfirm={() => void confirmUnlock()}
           onCancel={() => setUnlockTarget(null)}
         />
+      )}
+
+      {planTarget && (
+        <LockPlanModal lock={planTarget} onClose={() => setPlanTarget(null)} />
       )}
     </div>
   );

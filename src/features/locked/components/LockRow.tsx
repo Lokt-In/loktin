@@ -23,9 +23,15 @@ interface Props {
   lock: Lock;
   nowSecs: number;
   onUnlock: (lock: Lock) => void;
+  onViewPlan: (lock: Lock) => void;
 }
 
-export default function LockRow({ lock, nowSecs, onUnlock }: Props) {
+export default function LockRow({
+  lock,
+  nowSecs,
+  onUnlock,
+  onViewPlan,
+}: Props) {
   const status = lockStatus(lock, nowSecs);
   const months = lockMonths(lock);
 
@@ -102,24 +108,31 @@ export default function LockRow({ lock, nowSecs, onUnlock }: Props) {
         </div>
       </div>
 
-      <div className="shrink-0">
+      <div className="flex shrink-0 items-center gap-4 max-sm:justify-between">
         {status === "matured" ? (
           <DashButton
             variant="primary"
             onClick={() => onUnlock(lock)}
-            className="w-full sm:w-auto"
+            className="max-sm:flex-1"
           >
             Unlock Now
           </DashButton>
         ) : status === "locked" ? (
-          <DashButton variant="muted" disabled className="w-full sm:w-auto">
+          <DashButton variant="muted" disabled className="max-sm:flex-1">
             Locked · {timeLeftLabel(lock, nowSecs)}
           </DashButton>
         ) : (
-          <DashButton variant="muted" disabled className="w-full sm:w-auto">
+          <DashButton variant="muted" disabled className="max-sm:flex-1">
             Withdrawn
           </DashButton>
         )}
+        <button
+          type="button"
+          onClick={() => onViewPlan(lock)}
+          className="shrink-0 font-body text-[14px] font-semibold text-cyan underline underline-offset-4 transition hover:brightness-110"
+        >
+          View Plan
+        </button>
       </div>
     </li>
   );

@@ -1,7 +1,6 @@
 import type { TargetGoal } from "../hooks/useTargets";
 import {
   frequencyOf,
-  isEarlyWithdrawal,
   progressPct,
   targetStatus,
   type TargetStatus,
@@ -31,7 +30,7 @@ interface Props {
   goal: TargetGoal;
   nowSecs: number;
   onTopUp: (goal: TargetGoal) => void;
-  onWithdraw: (goal: TargetGoal) => void;
+  onViewPlan: (goal: TargetGoal) => void;
 }
 
 /* public/dashboard/icons/target-02.svg, inlined so stroke follows currentColor
@@ -98,18 +97,12 @@ export default function TargetRow({
   goal,
   nowSecs,
   onTopUp,
-  onWithdraw,
+  onViewPlan,
 }: Props) {
   const status = targetStatus(goal, nowSecs);
   if (status === "withdrawn") return <WithdrawnRow goal={goal} />;
 
   const pct = progressPct(goal);
-  const matured = status === "matured";
-
-  // A goal reaches its target before the deadline still forfeits 1% on
-  // withdrawal — the forfeit keys off `end_date`, not how full the goal is — so
-  // that case reads "Withdraw early" rather than "Withdraw Now".
-  const early = isEarlyWithdrawal(goal, nowSecs);
 
   return (
     <li className="flex flex-col gap-4 rounded-2xl border border-[#ffffff14] bg-[#101116] p-5 sm:flex-row sm:items-center sm:gap-6">
@@ -161,38 +154,21 @@ export default function TargetRow({
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
-        {matured ? (
-          <DashButton
-            variant={early ? "danger" : "primary"}
-            onClick={() => onWithdraw(goal)}
-            title={
-              early
-                ? `The contract charges the 1% forfeit until ${formatDateShort(goal.end_date)}.`
-                : undefined
-            }
-            className="w-full sm:w-auto"
-          >
-            {early ? "Withdraw early" : "Withdraw Now"}
-          </DashButton>
-        ) : (
-          <>
-            <DashButton
-              variant="secondary"
-              onClick={() => onTopUp(goal)}
-              className="w-full sm:w-auto"
-            >
-              Top Up
-            </DashButton>
-            <DashButton
-              variant="danger"
-              onClick={() => onWithdraw(goal)}
-              className="w-full sm:w-auto"
-            >
-              Withdraw early
-            </DashButton>
-          </>
-        )}
+      <div className="flex shrink-0 items-center gap-4 max-sm:justify-between">
+        <DashButton
+          variant="secondary"
+          onClick={() => onTopUp(goal)}
+          className="max-sm:flex-1"
+        >
+          Top Up
+        </DashButton>
+        <button
+          type="button"
+          onClick={() => onViewPlan(goal)}
+          className="shrink-0 font-body text-[14px] font-semibold text-cyan underline underline-offset-4 transition hover:brightness-110"
+        >
+          View Plan
+        </button>
       </div>
     </li>
   );
