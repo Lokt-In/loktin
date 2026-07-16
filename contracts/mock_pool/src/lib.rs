@@ -180,7 +180,7 @@ impl MockPool {
         env.storage().persistent().extend_ttl(&key, LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND);
     }
 
-    fn token_client(env: &Env) -> token::TokenClient {
+    fn token_client(env: &Env) -> token::TokenClient<'_> {
         let token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
         token::TokenClient::new(env, &token)
     }

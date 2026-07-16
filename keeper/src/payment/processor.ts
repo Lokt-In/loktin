@@ -1,6 +1,5 @@
 import * as Loktin from "plans";
 import { Keypair } from "@stellar/stellar-sdk";
-import { Buffer } from "buffer";
 
 type Bill = {
   id: bigint;
@@ -11,18 +10,6 @@ type Bill = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────
-
-function makeAuthSigner(adminKeypair: Keypair) {
-  return {
-    signAuthEntry: async (entryXdr: string) => {
-      const signature = adminKeypair.sign(Buffer.from(entryXdr, "base64"));
-      return {
-        signedAuthEntry: signature.toString("base64"),
-        signerAddress: adminKeypair.publicKey(),
-      };
-    },
-  };
-}
 
 function unwrap<T>(simResult: unknown): T {
   return (simResult as { value?: T })?.value ?? (simResult as T);
@@ -39,19 +26,21 @@ export function isBillDueToday(bill: Bill): boolean {
 
 // ── Public API ────────────────────────────────────────────────────
 
-export async function getAllCycles(
-  contract: Loktin.Client,
-  adminKeypair: Keypair,
-): Promise<bigint[]> {
-  try {
-    const tx = await contract.get_all_cycles();
-    const signed = await tx.signAuthEntries(makeAuthSigner(adminKeypair));
-    const result = await signed.send();
-    return unwrap<bigint[]>(result) ?? [];
-  } catch (error) {
-    console.error("Error getting all cycles:", error);
-    return [];
-  }
+/**
+ * `get_all_cycles` is a read: the binding already simulates it, so the value is
+ * on `.result` and no transaction needs to be sent.
+ *
+ * It does call `admin.require_auth()`, but simulation doesn't verify signatures,
+ * and the admin is the tx source anyway, so there are never any non-invoker auth
+ * entries to sign. The old code signed auth entries and sent a tx, which threw
+ * NoUnsignedNonInvokerAuthEntriesError and then swallowed it and returned `[]`,
+ * so every run reported "No cycles found" instead of failing.
+ *
+ * Errors propagate on purpose: a broken read must not look like an empty ledger.
+ */
+export async function getAllCycles(contract: Loktin.Client): Promise<bigint[]> {
+  const tx = await contract.get_all_cycles();
+  return tx.result.unwrap();
 }
 
 export async function getCycleBills(
@@ -84,14 +73,16 @@ export async function getCycleBills(
 
 export async function payBill(
   contract: Loktin.Client,
-  adminKeypair: Keypair,
   billId: bigint,
 ): Promise<{ success: boolean; billId: bigint; error?: string }> {
   try {
     console.log(`  → Paying bill ${billId}…`);
     const tx = await contract.admin_pay_bill({ bill_id: billId });
-    const signed = await tx.signAuthEntries(makeAuthSigner(adminKeypair));
-    await signed.send();
+    // Same story as `get_all_cycles`: the admin it requires is also the tx
+    // source, so the source-account signature authorizes the call and there are
+    // no non-invoker auth entries to sign. `signAndSend` uses the signer the
+    // client was constructed with (see payment/client.ts).
+    await tx.signAndSend();
     console.log(`  ✓ Bill ${billId} paid`);
     return { success: true, billId };
   } catch (error) {
@@ -103,14 +94,16 @@ export async function payBill(
 
 export async function processDueBills(
   contract: Loktin.Client,
-  adminKeypair: Keypair,
+  // The client already carries the admin signer, so the keypair isn't needed
+  // here. Kept in the signature so callers don't have to change.
+  _adminKeypair: Keypair,
 ): Promise<{ processed: number; paid: number; failed: number }> {
   console.log("\n┌─────────────────────────────────┐");
   console.log("│   Processing Due Bills          │");
   console.log("└─────────────────────────────────┘");
   console.log(`  Time: ${new Date().toISOString()}\n`);
 
-  const cycleIds = await getAllCycles(contract, adminKeypair);
+  const cycleIds = await getAllCycles(contract);
   if (!cycleIds.length) {
     console.log("  No cycles found.\n");
     return { processed: 0, paid: 0, failed: 0 };
@@ -129,7 +122,7 @@ export async function processDueBills(
         console.log(
           `  Due today: ${bill.name} (#${bill.id}) — ${Number(bill.amount) / 10_000_000} USDC`,
         );
-        const result = await payBill(contract, adminKeypair, bill.id);
+        const result = await payBill(contract, bill.id);
         if (result.success) paid++;
         else failed++;
       }
