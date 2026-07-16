@@ -59,15 +59,18 @@ export default function MobileMenu({
   // `will-change-transform`) make an ancestor the containing block for
   // position:fixed, which sized this overlay to the 76px header instead of the
   // viewport — the links overflowed onto a transparent area below the bar.
+  // `lk-theme` re-enables the redesign's rounded corners (base.css otherwise
+  // forces border-radius:0 on <button> outside it) and `font-body` restores the
+  // landing font — both are lost by portaling out to <body>.
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label="Menu"
-      className="fixed inset-0 z-[200] flex flex-col bg-ink md:hidden"
+      className="lk-theme fixed inset-0 z-[200] flex flex-col bg-ink font-body text-white md:hidden"
     >
       <div className="flex h-[76px] shrink-0 items-center justify-between px-5">
-        <a href="#top" onClick={onClose}>
+        <a href="#top" onClick={onClose} className="font-heading">
           <Wordmark />
         </a>
         <button
