@@ -5,6 +5,7 @@ import { useLocks, type Lock } from "../../features/locked/hooks/useLocks";
 import { useUsdcBalance } from "../../hooks/useUsdcBalance";
 import { lockStatus } from "../../features/locked/lib/lockMath";
 import LockRow from "../../features/locked/components/LockRow";
+import ProjectedGrowth from "../../features/locked/components/ProjectedGrowth";
 import UnlockModal from "../../features/locked/components/UnlockModal";
 import DashButton from "../../shared/dash/DashButton";
 import Spinner from "../../shared/dash/Spinner";
@@ -109,6 +110,12 @@ export default function Locked() {
           <p className="mt-8 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 font-body text-[13px] text-red-300">
             {lastError}
           </p>
+        )}
+
+        {/* Above the filter row on purpose: the pills scope the list below them,
+            not this chart, which always covers every active lock. */}
+        {!loading && locks.length > 0 && (
+          <ProjectedGrowth locks={locks} nowSecs={nowSecs} />
         )}
 
         {locks.length > 0 && (
