@@ -1,0 +1,83 @@
+name: Keeper
+
+# NOTE: GitHub only runs `schedule:` triggers from the repository's DEFAULT
+# branch (currently `staging`). This file has to be merged to staging before the
+# cron will ever fire; on a feature branch only the manual "Run workflow" button
+# below works.
+on:
+  schedule:
+    # Every 6 hours. All four jobs are due-guarded and idempotent: bill_payments
+    # only pays a bill that is `due today && !is_paid`, and target_periodic skips
+    # any goal where `now < last_deposit_date + period_seconds`. So running more
+    # often than the in-process node-cron cadence can't double-pay; it just
+    # narrows the gap between a period falling due and the deposit landing.
+    #
+    # Minute 17 rather than :00 on purpose — scheduled jobs on the hour are the
+    # most contended and get delayed the longest.
+    - cron: "17 */6 * * *"
+  workflow_dispatch: # manual run button, handy for demos and testing
+
+# A slow run must never overlap the next tick and submit the same tx twice.
+concurrency:
+  group: keeper
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    name: Run keeper jobs once
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The keeper imports the generated client packages via `file:../packages/*`,
+      # and their dist/ is gitignored, so it only exists once this runs.
+      - name: Build contract client packages
+        run: npm run install:contracts
+
+      - name: Install keeper dependencies
+        working-directory: keeper
+        run: npm ci
+
+      - name: Run keeper (all jobs once)
+        working-directory: keeper
+        run: npm run once
+        env:
+          # --- secret ---
+          # Signs process_period / bill payments. Must be the address the
+          # contract returns from keeper().
+          ADMIN_SECRET_KEY: ${{ secrets.ADMIN_SECRET_KEY }}
+
+          # --- public testnet config ---
+          # These contract ids are already public (they're baked into
+          # packages/*/src/index.ts), so they are not secrets.
+          STELLAR_NETWORK: TESTNET
+          NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+          RPC_URL: https://soroban-testnet.stellar.org
+          CONTRACT_ID: CAWJPGWXAYJ6Y6TIS4C6SIOHZOHPRQCJIVXDUVZBVII6RPWMKIUTRKEE
+          TARGET_SAVINGS_CONTRACT_ID: CBLZMVSR5NHSUN5A3J5Z433ZVR3VW7EDLX6T2PDVAVKVYDBIXFDRUKBB
+          LOCKED_IN_CONTRACT_ID: CBZNRI5PGBV4AQG6PLKCF6XEKLECKHDAXYELLOQDG26OG2UML74GVVEU
+          USDC_CONTRACT_ID: CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA
+          MOCK_POOL_CONTRACT_ID: CBYJA4C3T64FICRPDL2UBXWGJDAIAZVO27NN3K5RRTQCK3ASAPME4ZYG
+
+          # --- thresholds (stroops; 1 USDC = 10_000_000) ---
+          BLEND_SWEEP_MIN: "10000000"
+          RESERVE_MIN: "10000000"
+          RESERVE_TARGET: "50000000"
+          RESERVE_ADMIN_KEEP: "20000000"
+
+          # --- optional: off-chain goal index ---
+          # Without these, target_periodic falls back to walking goal ids on
+          # chain, which is fine at current volume.
+          PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}

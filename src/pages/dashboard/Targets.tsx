@@ -11,6 +11,7 @@ import {
   type TargetStatus,
 } from "../../features/targets/lib/targetMath";
 import TargetRow from "../../features/targets/components/TargetRow";
+import GoalProjection from "../../features/targets/components/GoalProjection";
 import TopUpModal from "../../features/targets/components/TopUpModal";
 import WithdrawModal from "../../features/targets/components/WithdrawModal";
 import DashButton from "../../shared/dash/DashButton";
@@ -159,6 +160,12 @@ export default function Targets() {
           <p className="mt-8 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 font-body text-[13px] text-red-300">
             {lastError}
           </p>
+        )}
+
+        {/* Above the filter row on purpose: the pills scope the list below them,
+            not this chart, which always covers every active goal. */}
+        {!loading && goals.length > 0 && (
+          <GoalProjection goals={goals} nowSecs={nowSecs} />
         )}
 
         {goals.length > 0 && (
