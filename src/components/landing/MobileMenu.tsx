@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Wordmark from "../../shared/components/Wordmark";
 
 export interface MobileNavLink {
@@ -54,7 +55,11 @@ export default function MobileMenu({
   const isActive = (href: string) =>
     href === "#top" ? hash === "" || hash === "#top" : hash === href;
 
-  return (
+  // Portal to <body>: the navbar's `backdrop-blur` (and the Reveal wrappers'
+  // `will-change-transform`) make an ancestor the containing block for
+  // position:fixed, which sized this overlay to the 76px header instead of the
+  // viewport — the links overflowed onto a transparent area below the bar.
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -124,6 +129,7 @@ export default function MobileMenu({
           {ctaLabel}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
