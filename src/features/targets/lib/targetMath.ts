@@ -120,6 +120,65 @@ export function withdrawalPayout(
   return goal.deposited - forfeitAmount(goal, nowSecs) + yieldStroops;
 }
 
+/**
+ * Where the deposit schedule *plans* a goal to be at `atSecs`: one
+ * `period_amount` per elapsed period since `start_date`, capped at
+ * `target_amount`.
+ *
+ * This is a forecast, not a fact — it assumes every scheduled deposit lands.
+ * The keeper only deposits when the wallet has the balance and allowance, so a
+ * missed period leaves the real total below this line. Kept in BigInt so it
+ * agrees with the on-chain figures at the endpoints.
+ */
+export function goalPlanValueAt(goal: TargetGoal, atSecs: number): bigint {
+  const start = Number(goal.start_date);
+  const end = Number(goal.end_date);
+  if (atSecs <= start || goal.period_seconds <= 0n) return 0n;
+  const clamped = Math.min(atSecs, end);
+  const periods = BigInt(
+    Math.floor((clamped - start) / Number(goal.period_seconds)),
+  );
+  const scheduled = goal.period_amount * periods;
+  return scheduled > goal.target_amount ? goal.target_amount : scheduled;
+}
+
+export type GoalGrowthPoint = { t: number; value: bigint };
+
+/**
+ * Combined planned savings of `goals` sampled across their whole span, for the
+ * projection chart. Completed goals are excluded — they're already settled and
+ * would just add a flat constant.
+ */
+export function goalGrowthSeries(
+  goals: TargetGoal[],
+  samples = 80,
+): GoalGrowthPoint[] {
+  const active = goals.filter((g) => !g.is_complete);
+  if (!active.length) return [];
+
+  const from = Math.min(...active.map((g) => Number(g.start_date)));
+  const to = Math.max(...active.map((g) => Number(g.end_date)));
+  if (to <= from) return [];
+
+  // Even grid plus each goal's start/end, so the line kinks exactly where a goal
+  // enters or its deadline lands rather than rounding those corners off.
+  const stamps = new Set<number>();
+  for (let i = 0; i < samples; i++) {
+    stamps.add(Math.round(from + ((to - from) * i) / (samples - 1)));
+  }
+  for (const g of active) {
+    stamps.add(Number(g.start_date));
+    stamps.add(Number(g.end_date));
+  }
+
+  return [...stamps]
+    .sort((a, b) => a - b)
+    .map((t) => ({
+      t,
+      value: active.reduce((sum, g) => sum + goalPlanValueAt(g, t), 0n),
+    }));
+}
+
 /** 0–100, clamped. */
 export function progressPct(goal: TargetGoal): number {
   if (goal.target_amount <= 0n) return 0;
