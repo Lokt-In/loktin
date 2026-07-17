@@ -51,7 +51,10 @@ function Check() {
  */
 export default function ProductSection() {
   return (
-    <section className="mx-auto max-w-(--max-width) px-5 py-24 md:px-8 lg:py-32">
+    <section
+      id="product"
+      className="mx-auto max-w-(--max-width) px-5 py-24 md:px-8 lg:py-32"
+    >
       <div className="text-center">
         {/* <span className="inline-flex items-center rounded-full border border-[#ffffff14] bg-surface px-4 py-1.5 font-body text-[13px] font-medium text-subtle">
           The Product
@@ -83,7 +86,10 @@ export default function ProductSection() {
           </ul>
         </div>
 
-        <div className="rounded-2xl border border-[#ffffff14] bg-surface p-6 md:p-8">
+        <div
+          id="how-it-works"
+          className="rounded-2xl border border-[#ffffff14] bg-surface p-6 md:p-8"
+        >
           {STEPS.map((step, i) => (
             <div
               key={step.n}
