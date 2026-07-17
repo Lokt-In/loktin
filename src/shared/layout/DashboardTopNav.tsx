@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import type { ReactNode } from "react";
 import WalletPill from "./WalletPill";
 import Wordmark from "../components/Wordmark";
+import DashboardMobileMenu from "./DashboardMobileMenu";
 
 /* The design's public/dashboard/icons/*.svg, inlined so `stroke` can follow
    `currentColor`. The source files hardcode #8E8E93 / #1A98AD, which as <img>
@@ -171,10 +173,11 @@ function NavItems() {
 
 /**
  * Dashboard chrome: wordmark, primary nav, wallet pill. Below `md` the nav
- * drops to its own horizontally scrollable row so the wordmark and wallet pill
- * always fit on the top line.
+ * collapses into a hamburger that opens a full-screen menu.
  */
 export default function DashboardTopNav() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <header className="sticky top-0 z-50 border-b border-[#ffffff44] bg-ink/90 backdrop-blur">
       <div className="mx-auto max-w-[1600px] px-4 sm:px-6 md:px-10">
@@ -190,15 +193,41 @@ export default function DashboardTopNav() {
             <NavItems />
           </nav>
 
-          <div className="ml-auto min-w-0">
+          <div className="ml-auto min-w-0 max-md:hidden">
             <WalletPill />
           </div>
-        </div>
 
-        <nav className="no-scrollbar -mx-4 flex items-center gap-1 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 md:hidden">
-          <NavItems />
-        </nav>
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={menuOpen}
+            className="ml-auto grid h-10 w-10 place-items-center text-white transition-colors hover:text-cyan md:hidden"
+          >
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden
+            >
+              <path
+                d="M4 7h16M4 12h16M4 17h16"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      <DashboardMobileMenu
+        open={menuOpen}
+        links={LINKS}
+        comingSoon={COMING_SOON}
+        onClose={() => setMenuOpen(false)}
+      />
     </header>
   );
 }
