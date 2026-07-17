@@ -56,7 +56,7 @@ export default function HeroSection() {
   };
 
   return (
-    <section ref={sectionRef} className="relative overflow-hidden">
+    <section id="top" ref={sectionRef} className="relative overflow-hidden">
       <svg
         ref={svgRef}
         aria-hidden
