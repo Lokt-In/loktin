@@ -206,6 +206,7 @@ export default function Targets() {
                   goal={g}
                   nowSecs={nowSecs}
                   onTopUp={setTopUpTarget}
+                  onWithdraw={openWithdraw}
                   onViewPlan={setPlanTarget}
                 />
               ))}

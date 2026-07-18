@@ -1,6 +1,7 @@
 import type { TargetGoal } from "../hooks/useTargets";
 import {
   frequencyOf,
+  isEarlyWithdrawal,
   progressPct,
   targetStatus,
   type TargetStatus,
@@ -30,6 +31,7 @@ interface Props {
   goal: TargetGoal;
   nowSecs: number;
   onTopUp: (goal: TargetGoal) => void;
+  onWithdraw: (goal: TargetGoal) => void;
   onViewPlan: (goal: TargetGoal) => void;
 }
 
@@ -97,12 +99,18 @@ export default function TargetRow({
   goal,
   nowSecs,
   onTopUp,
+  onWithdraw,
   onViewPlan,
 }: Props) {
   const status = targetStatus(goal, nowSecs);
   if (status === "withdrawn") return <WithdrawnRow goal={goal} />;
 
   const pct = progressPct(goal);
+  // "Finished" = deadline passed or target fully funded. Topping up a finished
+  // goal makes no sense, so it swaps Top Up for Withdraw (early ⇒ 1% forfeit,
+  // hence the red button).
+  const finished = status === "matured";
+  const early = isEarlyWithdrawal(goal, nowSecs);
 
   return (
     <li className="flex flex-col gap-4 rounded-2xl border border-[#ffffff14] bg-[#101116] p-5 sm:flex-row sm:items-center sm:gap-6">
@@ -155,13 +163,23 @@ export default function TargetRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-4 max-sm:justify-between">
-        <DashButton
-          variant="secondary"
-          onClick={() => onTopUp(goal)}
-          className="max-sm:flex-1"
-        >
-          Top Up
-        </DashButton>
+        {finished ? (
+          <DashButton
+            variant={early ? "danger" : "primary"}
+            onClick={() => onWithdraw(goal)}
+            className="max-sm:flex-1"
+          >
+            {early ? "Withdraw early" : "Withdraw Now"}
+          </DashButton>
+        ) : (
+          <DashButton
+            variant="secondary"
+            onClick={() => onTopUp(goal)}
+            className="max-sm:flex-1"
+          >
+            Top Up
+          </DashButton>
+        )}
         <button
           type="button"
           onClick={() => onViewPlan(goal)}
