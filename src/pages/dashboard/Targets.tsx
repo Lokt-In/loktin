@@ -14,6 +14,7 @@ import TargetRow from "../../features/targets/components/TargetRow";
 import GoalProjection from "../../features/targets/components/GoalProjection";
 import TopUpModal from "../../features/targets/components/TopUpModal";
 import WithdrawModal from "../../features/targets/components/WithdrawModal";
+import GoalPlanModal from "../../features/targets/components/GoalPlanModal";
 import DashButton from "../../shared/dash/DashButton";
 import Spinner from "../../shared/dash/Spinner";
 import FilterPills from "../../shared/dash/FilterPills";
@@ -53,6 +54,7 @@ export default function Targets() {
   const [page, setPage] = useState(1);
   const [topUpTarget, setTopUpTarget] = useState<TargetGoal | null>(null);
   const [withdrawTarget, setWithdrawTarget] = useState<TargetGoal | null>(null);
+  const [planTarget, setPlanTarget] = useState<TargetGoal | null>(null);
   const [goalYield, setGoalYield] = useState<bigint | null>(null);
 
   // A goal can cross its deadline while the page is open; nothing else would
@@ -205,6 +207,7 @@ export default function Targets() {
                   nowSecs={nowSecs}
                   onTopUp={setTopUpTarget}
                   onWithdraw={openWithdraw}
+                  onViewPlan={setPlanTarget}
                 />
               ))}
             </ul>
@@ -228,6 +231,18 @@ export default function Targets() {
           error={lastError}
           onConfirm={(amt) => void confirmTopUp(amt)}
           onCancel={() => setTopUpTarget(null)}
+        />
+      )}
+
+      {planTarget && (
+        <GoalPlanModal
+          goal={planTarget}
+          nowSecs={nowSecs}
+          onWithdraw={(g) => {
+            setPlanTarget(null);
+            openWithdraw(g);
+          }}
+          onClose={() => setPlanTarget(null)}
         />
       )}
 
