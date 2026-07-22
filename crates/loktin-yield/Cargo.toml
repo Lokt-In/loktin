@@ -1,0 +1,18 @@
+[package]
+name = "loktin-yield"
+description = "Shared Blend share-vault + performance-fee math for Loktin's yielding contracts"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+# A plain library crate — never built to wasm on its own. Bill Plans and
+# Spend & Save depend on it for the pool interface, share-vault math, and the
+# performance-fee calc, so that logic is written and tested once.
+[lib]
+crate-type = ["rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = "23.0.3"
