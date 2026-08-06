@@ -33,6 +33,7 @@
     "plans": "^0.0.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-is": "^19.2.8",
     "react-router-dom": "^7.9.3",
     "recharts": "^3.8.1",
     "spend_save": "^0.0.0",
