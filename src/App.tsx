@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import AppLayout from "./shared/layout/AppLayout";
 import DashboardLayout from "./shared/layout/DashboardLayout";
 import Landing from "./pages/Landing";
@@ -15,25 +16,28 @@ import Templates from "./pages/Templates";
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      {/* The dashboard ships its own chrome (DashboardTopNav), so it sits
-          outside AppLayout's legacy header/footer rather than nested in it. */}
-      <Route path="/dashboard" element={<DashboardLayout />}>
-        <Route index element={<Overview />} />
-        <Route path="plans" element={<Plans />} />
-        <Route path="targets" element={<Targets />} />
-        <Route path="targets/new" element={<CreateTarget />} />
-        <Route path="locked" element={<Locked />} />
-        <Route path="locked/new" element={<CreateLock />} />
-        <Route path="spend-save" element={<SpendSave />} />
-      </Route>
-      <Route element={<AppLayout />}>
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/templates" element={<Templates />} />
-        <Route path="/profile" element={<Profile />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        {/* The dashboard ships its own chrome (DashboardTopNav), so it sits
+            outside AppLayout's legacy header/footer rather than nested in it. */}
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<Overview />} />
+          <Route path="plans" element={<Plans />} />
+          <Route path="targets" element={<Targets />} />
+          <Route path="targets/new" element={<CreateTarget />} />
+          <Route path="locked" element={<Locked />} />
+          <Route path="locked/new" element={<CreateLock />} />
+          <Route path="spend-save" element={<SpendSave />} />
+        </Route>
+        <Route element={<AppLayout />}>
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/profile" element={<Profile />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <VercelAnalytics />
+    </>
   );
 }
