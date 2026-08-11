@@ -1,66 +1,74 @@
 import { useUsdcTrustline } from "../../hooks/useUsdcTrustline";
+import { useUsdcBalance } from "../../hooks/useUsdcBalance";
 import { USDC_FAUCET_URL } from "../../lib/usdc";
-import Button from "./Button";
+
+// Below this, the wallet can't really do anything yet, so we keep nudging the
+// user to the faucet. 5 USDC (7 decimals).
+const MIN_USDC = 5n * 10_000_000n;
+
+const BTN =
+  "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg bg-cyan px-5 py-2.5 font-body text-[14px] font-semibold whitespace-nowrap text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60";
 
 /**
- * Onboarding prompt: if the connected wallet is missing a USDC trustline, show
- * a one-time "Add USDC trustline" action plus a faucet link. Renders nothing
- * once the trustline exists. Kept deliberately plain pending the redesign.
+ * Onboarding bar under the dashboard nav. Three states:
+ *  1. No USDC trustline  -> add the trustline (a one-time signed tx).
+ *  2. Trustline, but < 5 USDC -> point the user at the Circle faucet to fund.
+ *     (This is the state right after a successful trustline add, when the
+ *     balance is still 0 — the bar must NOT vanish here.)
+ *  3. Funded (>= 5 USDC) -> render nothing.
  */
 export default function UsdcTrustlinePrompt() {
   const { hasTrustline, submitting, error, addTrustline } = useUsdcTrustline();
+  const { balance, loading: balLoading } = useUsdcBalance();
 
-  // Only surface once we know a trustline is missing.
-  if (hasTrustline !== false) return null;
+  // Trustline state not known yet — don't flash a bar.
+  if (hasTrustline === null) return null;
+
+  const needsTrustline = hasTrustline === false;
+  // Only judge "low" once the balance has actually loaded, so a funded wallet
+  // doesn't briefly flash the fund prompt while its balance reads back.
+  const lowBalance = hasTrustline === true && !balLoading && balance < MIN_USDC;
+
+  if (!needsTrustline && !lowBalance) return null;
 
   return (
-    <div
-      style={{
-        border: "1px solid var(--border)",
-        padding: "var(--sp-4)",
-        margin: "var(--sp-6) var(--sp-6) 0",
-      }}
-    >
-      <p
-        style={{ fontSize: "var(--font-size-sm)", marginBottom: "var(--sp-3)" }}
-      >
-        Your wallet can&apos;t hold USDC yet. Add a one-time USDC trustline,
-        then get test USDC from the faucet. (Needs a funded account — use
-        &ldquo;Get test XLM&rdquo; in the wallet menu first.)
-      </p>
-      {error && (
-        <p
-          style={{
-            fontSize: "var(--font-size-xs)",
-            color: "var(--status-error)",
-            marginBottom: "var(--sp-2)",
-          }}
-        >
-          {error}
-        </p>
-      )}
-      <div
-        style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center" }}
-      >
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => void addTrustline()}
-          isLoading={submitting}
-        >
-          Add USDC trustline
-        </Button>
-        <a
-          href={USDC_FAUCET_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            fontSize: "var(--font-size-sm)",
-            color: "var(--accent-primary)",
-          }}
-        >
-          Get test USDC →
-        </a>
+    <div className="mx-auto max-w-[1280px] px-4 pt-6 sm:px-6 md:px-10">
+      <div className="flex flex-col gap-4 rounded-2xl border border-cyan/25 bg-cyan/[0.06] p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="font-heading text-[15.5px] font-bold text-[#eef0f7]">
+            {needsTrustline
+              ? "Enable USDC on your wallet"
+              : "Add some test USDC to get started"}
+          </h2>
+          <p className="mt-1 font-body text-[13.5px] leading-relaxed text-subtle">
+            {needsTrustline
+              ? "Add a one-time USDC trustline so your wallet can hold and save USDC. It needs a little XLM for the fee — use “Get test XLM” in the wallet menu first."
+              : "Your balance is low. Grab free test USDC from the Circle faucet (choose Stellar and paste your wallet address), and it’ll show up here."}
+          </p>
+          {needsTrustline && error && (
+            <p className="mt-2 font-body text-[12.5px] text-red-300">{error}</p>
+          )}
+        </div>
+
+        {needsTrustline ? (
+          <button
+            type="button"
+            onClick={() => void addTrustline()}
+            disabled={submitting}
+            className={BTN}
+          >
+            {submitting ? "Adding…" : "Add USDC trustline"}
+          </button>
+        ) : (
+          <a
+            href={USDC_FAUCET_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={BTN}
+          >
+            Get test USDC →
+          </a>
+        )}
       </div>
     </div>
   );
