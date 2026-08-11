@@ -3,6 +3,7 @@ import HeroSection from "../components/landing/HeroSection";
 import ProductSection from "../components/landing/ProductSection";
 import PrimitivesSection from "../components/landing/PrimitivesSection";
 import FaqSection from "../components/landing/FaqSection";
+import WaitlistSection from "../components/landing/WaitlistSection";
 import CtaSection from "../components/landing/CtaSection";
 import Footer from "../components/landing/Footer";
 import Reveal from "../components/landing/Reveal";
@@ -29,6 +30,9 @@ export default function Landing() {
       </Reveal>
       <Reveal variant="scale">
         <CtaSection />
+      </Reveal>
+      <Reveal variant="up">
+        <WaitlistSection />
       </Reveal>
       <Footer />
     </div>
