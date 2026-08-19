@@ -198,21 +198,26 @@ export default function CreateTarget() {
                 min={minDate}
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
-                // Hide the UA's own picker indicator; the design's calendar-02
-                // icon below opens the picker instead.
-                className="w-full min-w-0 appearance-none border-0 bg-transparent font-mono text-[17px] text-white outline-none [&::-webkit-calendar-picker-indicator]:hidden"
+                // Hide only the UA's picker indicator (the calendar icon opens
+                // it). NOT `appearance-none` — that suppresses tap-to-open on
+                // iOS Safari, which left mobile users unable to pick a date.
+                className="w-full min-w-0 border-0 bg-transparent font-mono text-[17px] text-white outline-none [&::-webkit-calendar-picker-indicator]:hidden"
               />
-              <button
-                type="button"
+              {/* A <label>, not a button: tapping it forwards to the input,
+                  which opens the OS date picker natively on mobile — where
+                  showPicker() is missing or throws. showPicker (guarded) gives
+                  the nicer popup on desktop. */}
+              <label
+                htmlFor="deadline"
                 aria-label="Open date picker"
                 onClick={() => {
-                  const el = deadlineRef.current;
-                  // showPicker isn't in every browser; focusing still lets the
-                  // user type or open the native picker themselves.
-                  if (el?.showPicker) el.showPicker();
-                  else el?.focus();
+                  try {
+                    deadlineRef.current?.showPicker?.();
+                  } catch {
+                    // Mobile opens via the label's native focus; ignore.
+                  }
                 }}
-                className="shrink-0 text-muted transition-colors hover:text-white"
+                className="shrink-0 cursor-pointer text-muted transition-colors hover:text-white"
               >
                 {/* public/dashboard/icons/calendar-02.svg, inlined so stroke
                     follows currentColor (the source hardcodes #8E8E93). */}
@@ -252,7 +257,7 @@ export default function CreateTarget() {
                     strokeLinejoin="round"
                   />
                 </svg>
-              </button>
+              </label>
             </div>
             {deadline !== "" && goalSeconds <= 0n && (
               <p className="mt-3 font-body text-[13px] text-red-400">

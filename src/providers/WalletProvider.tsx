@@ -123,9 +123,13 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         popupLock.current = true;
         wallet.setWallet(walletId);
-        // Non-freighter wallets don't support silent background reads; trust the
-        // stored address until the user acts.
-        if (walletId !== "freighter" && stateRef.current.address) return;
+        // Only Freighter supports a silent background `getAddress()`. For popup /
+        // redirect wallets (Albedo, etc.) `getAddress()` OPENS A WINDOW every
+        // call — at a 1s poll that spawns an Albedo popup per second during the
+        // connect window (before an address is stored), making it impossible to
+        // connect. So never poll them: trust the stored session; the user's
+        // explicit connect/sign actions are the only time we open their wallet.
+        if (walletId !== "freighter") return;
         const [a, n] = await Promise.all([
           wallet.getAddress(),
           wallet.getNetwork(),
