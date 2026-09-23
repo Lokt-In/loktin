@@ -1,4 +1,5 @@
 #![no_std]
+use loktin_common::{LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND};
 
 mod error;
 mod events;
@@ -24,9 +25,7 @@ pub trait Pool {
     fn get_position(env: Env, supplier: Address) -> i128;
 }
 
-const DAY_IN_LEDGERS: u32 = 17280; // ~24h
-const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30;
-const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365;
+
 
 const FORFEIT_BPS: u32 = 100; // 1% on early withdrawal
 const BPS_DENOMINATOR: i128 = 10_000;

@@ -1,0 +1,12 @@
+[package]
+name = "loktin-common"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+soroban-sdk.workspace = true
+
+[dev-dependencies]
