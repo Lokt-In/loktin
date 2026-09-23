@@ -1,5 +1,3 @@
-# Contributing
-
 Welcome! and thanks for helping out.
 
 ## Before you start
@@ -50,7 +48,7 @@ New frontend code goes in `src/features/<domain>/`. Look at `src/features/target
 
 ## Don't edit `packages/`
 
-Those TypeScript clients are generated from *deployed* contracts with `stellar contract bindings ts`, and they carry hardcoded contract IDs. Regenerating requires a deploy, so maintainers do it between phases.
+Those TypeScript clients are generated from _deployed_ contracts with `stellar contract bindings ts`, and they carry hardcoded contract IDs. Regenerating requires a deploy, so maintainers do it between phases.
 
 **Contract PRs stop at `cargo test --workspace` passing.** If your change alters a contract's public interface, say so in the PR description and we'll regenerate.
 
@@ -94,7 +92,7 @@ cargo build --target wasm32v1-none --release
 ## What we look for in review
 
 - **Every acceptance-criteria box ticked**, or a note saying why not.
-- **Tests that would fail without your change.** For contract work involving user funds, that means a test with *more than one user* — most of the bugs we're fixing only appear when two people share a contract.
+- **Tests that would fail without your change.** For contract work involving user funds, that means a test with _more than one user_ — most of the bugs we're fixing only appear when two people share a contract.
 - **Scope held.** Fix the issue, not the surrounding code. Spotted something else? Open an issue.
 - **Follow the neighbouring code.** Match the patterns in the files you're touching rather than introducing a new style.
 - **Screenshots** for anything visual, before and after.
