@@ -1,4 +1,5 @@
 #![no_std]
+use loktin_common::{LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND};
 
 //! Mock Blend pool.
 //!
@@ -23,9 +24,7 @@ use soroban_sdk::{contract, contractimpl, token, Address, Env};
 use error::Error;
 use types::{DataKey, Position};
 
-const DAY_IN_LEDGERS: u32 = 17280;
-const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30;
-const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365;
+
 
 const BPS_DENOMINATOR: i128 = 10_000;
 const SECONDS_PER_YEAR: i128 = 31_536_000;
