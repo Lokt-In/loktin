@@ -65,7 +65,7 @@ fn test_spend_routes_correctly() {
     let p = client.get_position(&user);
     assert_eq!(p.saved_balance, 20_000_000);
     assert_eq!(p.total_saved_lifetime, 20_000_000);
-    assert_eq!(p.total_spent_lifetime, 80_000_000);
+    assert_eq!(p.total_spent_lifetime, 100_000_000);
 }
 
 #[test]
@@ -106,3 +106,41 @@ fn test_blend_stubs() {
 }
 
 const _: u64 = SECONDS_PER_DAY; // silence unused if not referenced
+
+#[test]
+fn test_zero_share_mint_rejected() {
+    let (env, _admin, user, _token, client) = setup_at(TS_15TH);
+    client.enroll(&user, &2000u32); // 20%
+    let recipient = Address::generate(&env);
+    
+    let token_admin = StellarAssetClient::new(&env, &client.usdc_token());
+    
+    // Initial spend
+    client.spend(&user, &recipient, &100_000_000); // Saves 20 USDC, gets 20M shares
+    
+    token_admin.mint(&client.address, &100_000_000_000_i128); 
+    token_admin.mint(&user, &10_000_000);
+    
+    let res = client.try_spend(&user, &recipient, &10_000_000);
+    assert!(res.is_err()); // ZeroShares
+}
+
+#[test]
+fn test_multi_user_spend_and_withdraw() {
+    let (env, _admin, user1, _token, client) = setup_at(TS_15TH);
+    let user2 = Address::generate(&env);
+    let token_admin = StellarAssetClient::new(&env, &client.usdc_token());
+    token_admin.mint(&user2, &100_000_000); 
+    
+    client.enroll(&user1, &5000u32);
+    client.enroll(&user2, &5000u32);
+    let recipient = Address::generate(&env);
+    
+    client.spend(&user1, &recipient, &100_000_000);
+    client.spend(&user2, &recipient, &100_000_000);
+    
+    env.ledger().set_timestamp(TS_28TH);
+    
+    client.withdraw(&user1, &50_000_000);
+    client.withdraw(&user2, &50_000_000);
+}

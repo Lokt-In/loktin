@@ -1,17 +1,26 @@
 #![no_std]
+use loktin_common::{LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND};
 
 mod error;
 mod events;
 mod types;
 
-use soroban_sdk::{contract, contractimpl, token, Address, Env};
+use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
+use soroban_sdk::{
+    contract, contractclient, contractimpl, symbol_short, token, vec, Address, Env, IntoVal,
+};
 
 use error::Error;
 use types::{DataKey, SpendSavePosition};
 
-const DAY_IN_LEDGERS: u32 = 17280;
-const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30;
-const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365;
+#[contractclient(name = "PoolClient")]
+pub trait Pool {
+    fn supply(env: Env, from: Address, amount: i128);
+    fn withdraw(env: Env, from: Address, amount: i128) -> i128;
+    fn get_position(env: Env, supplier: Address) -> i128;
+}
+
+
 
 const BPS_DENOMINATOR: i128 = 10_000;
 const SECONDS_PER_DAY: u64 = 86_400;
@@ -36,8 +45,19 @@ impl SpendSave {
         env.storage().instance().get(&DataKey::Admin).ok_or(Error::AdminNotSet)
     }
 
-    pub fn usdc_token(env: Env) -> Address {
-        env.storage().instance().get(&DataKey::UsdcToken).unwrap()
+    pub fn usdc_token(env: Env) -> Result<Address, Error> {
+        env.storage().instance().get(&DataKey::UsdcToken).ok_or(Error::UsdcTokenNotSet)
+    }
+
+    pub fn set_pool(env: Env, pool: Address) -> Result<(), Error> {
+        let admin = Self::admin(env.clone())?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Pool, &pool);
+        Ok(())
+    }
+
+    pub fn pool(env: Env) -> Result<Address, Error> {
+        Self::pool_addr(&env)
     }
 
     // User functions
@@ -60,6 +80,7 @@ impl SpendSave {
                 user: user.clone(),
                 save_percentage: save_percentage_bps,
                 saved_balance: 0,
+                shares: 0,
                 total_spent_lifetime: 0,
                 total_saved_lifetime: 0,
                 created_date: now,
@@ -85,18 +106,36 @@ impl SpendSave {
         let saved = total_amount * (position.save_percentage as i128) / BPS_DENOMINATOR;
         let sent = total_amount - saved;
 
-        let token = Self::token_client(&env);
+        let token = Self::token_client(&env)?;
+        let self_addr = env.current_contract_address();
+
+        let total_assets = token.balance(&self_addr) + Self::blend_position_internal(&env);
+        let total_shares = Self::total_shares(&env);
+
+        let shares_to_mint = if total_shares == 0 || total_assets == 0 {
+            saved
+        } else {
+            saved * total_shares / total_assets
+        };
+
+        if shares_to_mint == 0 && saved > 0 {
+            return Err(Error::ZeroShares);
+        }
+
         // Pull total_amount from user
-        token.transfer(&user, &env.current_contract_address(), &total_amount);
+        token.transfer(&user, &self_addr, &total_amount);
         // Forward sent to recipient
         if sent > 0 {
-            token.transfer(&env.current_contract_address(), &recipient, &sent);
+            token.transfer(&self_addr, &recipient, &sent);
         }
         // saved stays in this contract
 
         position.saved_balance += saved;
-        position.total_spent_lifetime += sent;
+        position.shares += shares_to_mint;
+        position.total_spent_lifetime += total_amount;
         position.total_saved_lifetime += saved;
+
+        env.storage().instance().set(&DataKey::TotalShares, &(total_shares + shares_to_mint));
         env.storage().persistent().set(&DataKey::Position(user.clone()), &position);
         Self::extend_ttl(&env, &DataKey::Position(user.clone()));
 
@@ -120,10 +159,54 @@ impl SpendSave {
             return Err(Error::InsufficientSavedBalance);
         }
 
-        let token = Self::token_client(&env);
-        token.transfer(&env.current_contract_address(), &user, &amount);
+        let token = Self::token_client(&env)?;
+        let self_addr = env.current_contract_address();
 
-        position.saved_balance -= amount;
+        let total_assets = token.balance(&self_addr) + Self::blend_position_internal(&env);
+        let total_shares = Self::total_shares(&env);
+
+        let shares_to_burn = if total_assets == 0 {
+            amount
+        } else {
+            (amount * total_shares + total_assets - 1) / total_assets
+        };
+
+        if shares_to_burn == 0 || shares_to_burn > position.shares {
+            return Err(Error::InsufficientSavedBalance);
+        }
+
+        let idle = token.balance(&self_addr);
+        if idle < amount {
+            let pulled = match Self::pool_addr(&env) {
+                Ok(pool) => {
+                    let pc = PoolClient::new(&env, &pool);
+                    let pool_pos = pc.get_position(&self_addr);
+                    let shortfall = amount - idle;
+                    let pull = if shortfall <= pool_pos { shortfall } else { pool_pos };
+                    if pull > 0 {
+                        pc.withdraw(&self_addr, &pull);
+                    }
+                    pull
+                }
+                Err(_) => 0,
+            };
+            if idle + pulled < amount {
+                return Err(Error::InsufficientSavedBalance);
+            }
+        }
+
+        token.transfer(&self_addr, &user, &amount);
+
+        position.saved_balance -= amount; // wait, if they earned yield, this could go negative?
+        // Actually, if amount > saved_balance, we should handle it, or just use saved_balance as principal tracker loosely.
+        if position.saved_balance < amount {
+            position.saved_balance = 0;
+        } else {
+            position.saved_balance -= amount;
+        }
+        position.shares -= shares_to_burn;
+
+        env.storage().instance().set(&DataKey::TotalShares, &(total_shares - shares_to_burn));
         env.storage().persistent().set(&DataKey::Position(user.clone()), &position);
         Self::extend_ttl(&env, &DataKey::Position(user.clone()));
 
@@ -152,6 +235,26 @@ impl SpendSave {
     pub fn deposit_to_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        let pool = Self::pool_addr(&env)?;
+        let token = Self::usdc_token(env.clone())?;
+        let self_addr = env.current_contract_address();
+
+        env.authorize_as_current_contract(vec![
+            &env,
+            InvokerContractAuthEntry::Contract(SubContractInvocation {
+                context: ContractContext {
+                    contract: token.clone(),
+                    fn_name: symbol_short!("transfer"),
+                    args: (self_addr.clone(), pool.clone(), amount).into_val(&env),
+                },
+                sub_invocations: vec![&env],
+            }),
+        ]);
+
+        PoolClient::new(&env, &pool).supply(&self_addr, &amount);
         events::BlendDeposit { amount }.publish(&env);
         Ok(())
     }
@@ -159,19 +262,41 @@ impl SpendSave {
     pub fn withdraw_from_blend(env: Env, amount: i128) -> Result<(), Error> {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        let pool = Self::pool_addr(&env)?;
+        PoolClient::new(&env, &pool).withdraw(&env.current_contract_address(), &amount);
         events::BlendWithdraw { amount }.publish(&env);
         Ok(())
     }
 
-    pub fn blend_position(_env: Env) -> i128 {
-        0
+    pub fn blend_position(env: Env) -> i128 {
+        Self::blend_position_internal(&env)
     }
 
     // Internal helpers
 
-    fn token_client(env: &Env) -> token::TokenClient<'_> {
-        let token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
-        token::TokenClient::new(env, &token)
+    fn token_client(env: &Env) -> Result<token::TokenClient<'_>, Error> {
+        let token: Address = env.storage().instance().get(&DataKey::UsdcToken).ok_or(Error::UsdcTokenNotSet)?;
+        Ok(token::TokenClient::new(env, &token))
+    }
+
+    fn pool_addr(env: &Env) -> Result<Address, Error> {
+        env.storage().instance().get(&DataKey::Pool).ok_or(Error::PoolNotSet)
+    }
+
+    fn total_shares(env: &Env) -> i128 {
+        env.storage().instance().get(&DataKey::TotalShares).unwrap_or(0)
+    }
+
+    fn blend_position_internal(env: &Env) -> i128 {
+        match Self::pool_addr(env) {
+            Ok(pool) => {
+                PoolClient::new(env, &pool).get_position(&env.current_contract_address())
+            }
+            Err(_) => 0,
+        }
     }
 
     fn extend_ttl(env: &Env, key: &DataKey) {

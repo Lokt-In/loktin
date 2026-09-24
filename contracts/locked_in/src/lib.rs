@@ -1,4 +1,5 @@
 #![no_std]
+use loktin_common::{LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND};
 
 mod error;
 mod events;
@@ -14,9 +15,7 @@ use soroban_sdk::{
 use error::Error;
 use types::{DataKey, Lock};
 
-const DAY_IN_LEDGERS: u32 = 17280;
-const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30;
-const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365;
+
 
 const SECONDS_PER_MONTH: u64 = 2_592_000; // 30 days
 const SECONDS_PER_YEAR: i128 = 31_536_000;

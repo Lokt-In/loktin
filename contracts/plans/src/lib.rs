@@ -1,4 +1,5 @@
 #![no_std]
+use loktin_common::{LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND};
 
 mod error;
 mod events;
@@ -10,9 +11,7 @@ use soroban_sdk::{contract, contractimpl, token, Address, Env, String, Vec};
 use error::Error;
 use types::{Bill, BillCycle, DataKey};
 
-const DAY_IN_LEDGERS: u32 = 17280; // ~24 hours
-const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30; // 30 days
-const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365; // 1 year
+
 
 #[contract]
 pub struct Plans;

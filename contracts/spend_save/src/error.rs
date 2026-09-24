@@ -11,4 +11,7 @@ pub enum Error {
     InvalidAmount = 12,
     NotWithdrawalDay = 13,
     InsufficientSavedBalance = 14,
+    PoolNotSet = 15,
+    UsdcTokenNotSet = 16,
+    ZeroShares = 17,
 }

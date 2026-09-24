@@ -6,6 +6,7 @@ pub struct SpendSavePosition {
     pub user: Address,
     pub save_percentage: u32, // basis points, 100..5000 (1%..50%)
     pub saved_balance: i128,
+    pub shares: i128,
     pub total_spent_lifetime: i128,
     pub total_saved_lifetime: i128,
     pub created_date: u64,
@@ -16,5 +17,7 @@ pub struct SpendSavePosition {
 pub enum DataKey {
     Admin,
     UsdcToken,
+    Pool,
+    TotalShares,
     Position(Address),
 }
