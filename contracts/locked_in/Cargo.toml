@@ -1,6 +1,6 @@
 [package]
 name = "locked_in"
-description = "Fixed-term USDC lock with tiered APY and projected yield"
+description = "Fixed-term USDC lock with tiered APY and share-based real yield"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -16,6 +16,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = "23.0.3"
+loktin-yield = { path = "../../crates/loktin-yield" }
 
 [dev-dependencies]
 stellar-xdr = { version = "23.0.0", features = ["curr", "serde"] }

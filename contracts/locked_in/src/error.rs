@@ -14,4 +14,10 @@ pub enum Error {
     NotLockOwner = 15,
     DurationTierMissing = 16,
     PoolNotSet = 17,
+    /// The deposit is too small to buy one whole share; minting it would take
+    /// the user's money and give them no claim, so the lock is rejected.
+    ZeroShares = 18,
+    /// The vault cannot cover the shares' redemption value (pool underfunded).
+    /// Paying a partial amount would silently short the user.
+    InsufficientLiquidity = 19,
 }

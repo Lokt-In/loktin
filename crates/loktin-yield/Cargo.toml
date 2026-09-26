@@ -1,0 +1,18 @@
+[package]
+name = "loktin-yield"
+description = "Share-vault yield accounting shared by Loktin's yielding contracts"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+# A plain library crate — never built to wasm on its own. The yielding
+# contracts depend on it for the share math and the pool interface, so that
+# accounting is written and tested once.
+[lib]
+crate-type = ["rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = "23.0.3"

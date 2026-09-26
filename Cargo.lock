@@ -773,9 +773,17 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 name = "locked_in"
 version = "0.0.1"
 dependencies = [
+ "loktin-yield",
  "mock_pool",
  "soroban-sdk",
  "stellar-xdr",
+]
+
+[[package]]
+name = "loktin-yield"
+version = "0.0.1"
+dependencies = [
+ "soroban-sdk",
 ]
 
 [[package]]
