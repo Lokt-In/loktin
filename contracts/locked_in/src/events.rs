@@ -13,6 +13,9 @@ pub struct Locked {
     pub lock_id: u64,
     pub user: Address,
     pub amount: i128,
+    /// Shares minted for this lock; the source of truth for the payout.
+    pub shares: i128,
+    /// Display estimate only, not a promise.
     pub projected_yield: i128,
 }
 

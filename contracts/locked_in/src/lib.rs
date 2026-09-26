@@ -5,33 +5,30 @@ mod events;
 mod test;
 mod types;
 
+use loktin_yield::{assets_for_shares, shares_for_deposit, PoolClient};
 use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
 use soroban_sdk::{
-    contract, contractclient, contractimpl, symbol_short, token, vec, Address, Env, IntoVal, Map,
-    Vec,
+    contract, contractimpl, symbol_short, token, vec, Address, Env, IntoVal, Map, Vec,
 };
 
 use error::Error;
 use types::{DataKey, Lock};
 
-const DAY_IN_LEDGERS: u32 = 17280;
+const DAY_IN_LEDGERS: u32 = 17_280;
 const LEDGER_TTL_THRESHOLD: u32 = DAY_IN_LEDGERS * 30;
 const LEDGER_TTL_EXTEND: u32 = DAY_IN_LEDGERS * 365;
 
-const SECONDS_PER_MONTH: u64 = 2_592_000; // 30 days
-const SECONDS_PER_YEAR: i128 = 31_536_000;
+// One month is exactly one twelfth of the 365-day year, so a 12-month lock runs
+// the full 365 days and its advertised APY is earned in full. With a flat 30-day
+// month a "12 month" lock ran only 360 days and paid 360/365 of the advertised
+// rate (9.86% for a "10% APY" tier). Resolving it here keeps `duration_seconds`
+// and `projected_yield` self-consistent with `SECONDS_PER_YEAR`.
+const SECONDS_PER_MONTH: u64 = 2_628_000; // 365 / 12 days
+const SECONDS_PER_YEAR: i128 = 31_536_000; // 365 days
 const BPS_DENOMINATOR: i128 = 10_000;
 
-// ── Pool interface ───────────────────────────────────────────────────
-// Minimal client for the (mock) Blend pool this contract supplies idle USDC to.
-// Matches mock_pool's `supply` / `withdraw` / `get_position` surface; swapping in
-// real Blend later only changes the bodies below, not this contract's public API.
-#[contractclient(name = "PoolClient")]
-pub trait Pool {
-    fn supply(env: Env, from: Address, amount: i128);
-    fn withdraw(env: Env, from: Address, amount: i128) -> i128;
-    fn get_position(env: Env, supplier: Address) -> i128;
-}
+// The pool interface (`PoolClient`) and the share math now come from the shared
+// `loktin-yield` crate so every yielding contract prices shares the same way.
 
 // ── Contract ─────────────────────────────────────────────────────────
 
@@ -45,6 +42,7 @@ impl LockedIn {
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::UsdcToken, &usdc_token);
         env.storage().instance().set(&DataKey::LockCounter, &0u64);
+        env.storage().instance().set(&DataKey::TotalShares, &0i128);
 
         // Default APY tiers: 1mo=4%, 3mo=6%, 6mo=8%, 12mo=10%
         let mut tiers: Map<u32, u32> = Map::new(&env);
@@ -53,6 +51,8 @@ impl LockedIn {
         tiers.set(6, 800);
         tiers.set(12, 1000);
         env.storage().instance().set(&DataKey::ApyTiers, &tiers);
+
+        Self::extend_ttl_instance(&env);
     }
 
     // ── Admin ──
@@ -67,6 +67,7 @@ impl LockedIn {
         let mut tiers: Map<u32, u32> = env.storage().instance().get(&DataKey::ApyTiers).unwrap();
         tiers.set(duration_months, apy_basis_points);
         env.storage().instance().set(&DataKey::ApyTiers, &tiers);
+        Self::extend_ttl_instance(&env);
         events::ApyTierSet { duration_months, apy_basis_points }.publish(&env);
         Ok(())
     }
@@ -91,6 +92,7 @@ impl LockedIn {
         let admin = Self::admin(env.clone())?;
         admin.require_auth();
         env.storage().instance().set(&DataKey::Pool, &pool);
+        Self::extend_ttl_instance(&env);
         Ok(())
     }
 
@@ -100,16 +102,32 @@ impl LockedIn {
 
     // ── for users ──
 
-    // Lock USDC for a fixed duration. Returns the lock id.
-    // Computes and stores projected_yield (display only for now).
+    // Lock USDC for a fixed duration. Returns the lock id (1-indexed).
+    //
+    // The lock records `shares` of the pooled vault. The maturity payout is
+    // whatever those shares redeem for at that time; `projected_yield` is a
+    // display estimate only and is never paid as a promise.
     pub fn lock(env: Env, user: Address, amount: i128, duration_months: u32) -> Result<u64, Error> {
         user.require_auth();
         if amount <= 0 {
             return Err(Error::InvalidAmount);
         }
-        let apy_bps = Self::get_apy_for_duration(env.clone(), duration_months)?;
+        // Range check BEFORE the tier lookup. The tier map only holds 1/3/6/12,
+        // so looking it up first made every out-of-range duration fail with
+        // `DurationTierMissing` and left `InvalidDuration` unreachable.
         if duration_months == 0 || duration_months > 60 {
             return Err(Error::InvalidDuration);
+        }
+        let apy_bps = Self::get_apy_for_duration(env.clone(), duration_months)?;
+
+        // Price the deposit against what the vault owns *before* it lands, so an
+        // existing depositor's accrued yield is not diluted by the newcomer.
+        let total_shares = Self::load_total_shares(&env);
+        let total_assets = Self::vault_assets(&env);
+        let shares = shares_for_deposit(amount, total_shares, total_assets);
+        // A zero-share mint would take the user's money and give them no claim.
+        if shares <= 0 {
+            return Err(Error::ZeroShares);
         }
 
         let token = Self::token_client(&env);
@@ -119,14 +137,17 @@ impl LockedIn {
         let duration_seconds = (duration_months as u64) * SECONDS_PER_MONTH;
         let end_date = now + duration_seconds;
         // projected_yield = amount * apy_bps / 10000 * duration_seconds / SECONDS_PER_YEAR
+        // Display estimate only — the payout is driven by `shares`.
         let projected_yield = amount * (apy_bps as i128) / BPS_DENOMINATOR
-            * (duration_seconds as i128) / SECONDS_PER_YEAR;
+            * (duration_seconds as i128)
+            / SECONDS_PER_YEAR;
 
         let id = Self::next_id(&env);
         let lock = Lock {
             id,
             user: user.clone(),
             amount,
+            shares,
             apy_basis_points: apy_bps,
             duration_seconds,
             start_date: now,
@@ -138,19 +159,29 @@ impl LockedIn {
         env.storage().persistent().set(&DataKey::Lock(id), &lock);
         Self::extend_ttl(&env, &DataKey::Lock(id));
 
-        let mut user_locks: Vec<u64> = env.storage().persistent()
+        let mut user_locks: Vec<u64> = env
+            .storage()
+            .persistent()
             .get(&DataKey::UserLocks(user.clone()))
             .unwrap_or_else(|| Vec::new(&env));
         user_locks.push_back(id);
         env.storage().persistent().set(&DataKey::UserLocks(user.clone()), &user_locks);
         Self::extend_ttl(&env, &DataKey::UserLocks(user.clone()));
 
-        events::Locked { lock_id: id, user, amount, projected_yield }.publish(&env);
+        env.storage().instance().set(&DataKey::TotalShares, &(total_shares + shares));
+        Self::extend_ttl_instance(&env);
+
+        events::Locked { lock_id: id, user, amount, shares, projected_yield }.publish(&env);
         Ok(id)
     }
 
-    // Unlock and return principal. Reverts if before end_date.
-    // (Yield from Blend is added when Blend integration is live.)
+    // Unlock a matured lock and pay out what its shares redeem for.
+    //
+    // The payout comes from the vault's *current* value, so it includes only
+    // yield the pool actually earned. Idle USDC that would leave the contract
+    // short is pulled from the pool first; if the vault genuinely cannot cover
+    // it the call fails instead of paying a phantom figure out of another user's
+    // principal.
     pub fn unlock(env: Env, user: Address, lock_id: u64) -> Result<i128, Error> {
         user.require_auth();
         let mut lock = Self::get_lock(env.clone(), lock_id)?;
@@ -168,37 +199,34 @@ impl LockedIn {
         let token = Self::token_client(&env);
         let self_addr = env.current_contract_address();
 
-        // Pay principal + the yield projected at lock time. The principal always
-        // lives either idle here or supplied to the pool; the yield is only real
-        // if funds were put to work in the pool. Pull any shortfall from the pool,
-        // capped at the pool position so this can never trap. If the pool can't
-        // cover the full amount, pay what's available (principal is always covered).
-        let mut payout = lock.amount + lock.projected_yield;
+        let total_shares = Self::load_total_shares(&env);
+        let payout = assets_for_shares(lock.shares, total_shares, Self::vault_assets(&env));
+
+        // Cover the payout with idle USDC, pulling the shortfall back from the
+        // pool (capped at the pool position so this can never over-withdraw).
         let idle = token.balance(&self_addr);
         if idle < payout {
-            let pulled = match Self::pool_addr(&env) {
-                Ok(pool) => {
-                    let pc = PoolClient::new(&env, &pool);
-                    let position = pc.get_position(&self_addr);
-                    let shortfall = payout - idle;
-                    let pull = if shortfall <= position { shortfall } else { position };
-                    if pull > 0 {
-                        pc.withdraw(&self_addr, &pull);
-                    }
-                    pull
+            if let Ok(pool) = Self::pool_addr(&env) {
+                let pc = PoolClient::new(&env, &pool);
+                let position = pc.get_position(&self_addr);
+                let shortfall = payout - idle;
+                let pull = if shortfall <= position { shortfall } else { position };
+                if pull > 0 {
+                    pc.withdraw(&self_addr, &pull);
                 }
-                Err(_) => 0,
-            };
-            let available = idle + pulled;
-            if available < payout {
-                payout = available;
             }
+        }
+        if token.balance(&self_addr) < payout {
+            return Err(Error::InsufficientLiquidity);
         }
         token.transfer(&self_addr, &user, &payout);
 
         lock.is_unlocked = true;
         env.storage().persistent().set(&DataKey::Lock(lock_id), &lock);
         Self::extend_ttl(&env, &DataKey::Lock(lock_id));
+
+        env.storage().instance().set(&DataKey::TotalShares, &(total_shares - lock.shares));
+        Self::extend_ttl_instance(&env);
 
         events::Unlocked { lock_id, user, payout }.publish(&env);
         Ok(payout)
@@ -211,9 +239,18 @@ impl LockedIn {
     }
 
     pub fn get_user_locks(env: Env, user: Address) -> Vec<u64> {
-        env.storage().persistent()
-            .get(&DataKey::UserLocks(user))
-            .unwrap_or_else(|| Vec::new(&env))
+        env.storage().persistent().get(&DataKey::UserLocks(user)).unwrap_or_else(|| Vec::new(&env))
+    }
+
+    // Total shares outstanding across every live lock.
+    pub fn total_shares(env: Env) -> i128 {
+        Self::load_total_shares(&env)
+    }
+
+    // Everything the vault owns right now: idle USDC plus the pool position.
+    // This is the denominator the shares are priced against.
+    pub fn total_assets(env: Env) -> i128 {
+        Self::vault_assets(&env)
     }
 
     // ── Blend integration ──
@@ -268,12 +305,7 @@ impl LockedIn {
 
     // This contract's current pool position (principal + accrued yield). 0 if unset.
     pub fn blend_position(env: Env) -> i128 {
-        match Self::pool_addr(&env) {
-            Ok(pool) => {
-                PoolClient::new(&env, &pool).get_position(&env.current_contract_address())
-            }
-            Err(_) => 0,
-        }
+        Self::pool_position(&env)
     }
 
     // Internal functions
@@ -282,6 +314,25 @@ impl LockedIn {
         env.storage().instance().get(&DataKey::Pool).ok_or(Error::PoolNotSet)
     }
 
+    fn pool_position(env: &Env) -> i128 {
+        match Self::pool_addr(env) {
+            Ok(pool) => PoolClient::new(env, &pool).get_position(&env.current_contract_address()),
+            Err(_) => 0,
+        }
+    }
+
+    fn vault_assets(env: &Env) -> i128 {
+        let idle = Self::token_client(env).balance(&env.current_contract_address());
+        idle + Self::pool_position(env)
+    }
+
+    fn load_total_shares(env: &Env) -> i128 {
+        env.storage().instance().get(&DataKey::TotalShares).unwrap_or(0)
+    }
+
+    // IDs start at 1 (never 0) so an unset counter is distinguishable from a real
+    // id. Mirrors `loktin_common::next_id`, which will replace this once the
+    // shared crate lands.
     fn next_id(env: &Env) -> u64 {
         let counter: u64 = env.storage().instance().get(&DataKey::LockCounter).unwrap_or(0);
         let next = counter + 1;
@@ -296,5 +347,11 @@ impl LockedIn {
 
     fn extend_ttl(env: &Env, key: &DataKey) {
         env.storage().persistent().extend_ttl(key, LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND);
+    }
+
+    // Keeps the instance entry (admin, token, tiers, counters) alive. Mirrors
+    // `loktin_common::extend_ttl_instance`.
+    fn extend_ttl_instance(env: &Env) {
+        env.storage().instance().extend_ttl(LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND);
     }
 }
