@@ -3,7 +3,8 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::testutils::{Address as _, Ledger};
-use soroban_sdk::{token::StellarAssetClient, Env};
+use soroban_sdk::Env;
+use test_utils::{create_token_contract, mint_tokens};
 
 const SECONDS_PER_DAY: u64 = 86_400;
 
@@ -19,11 +20,8 @@ fn setup_at(ts: u64) -> (Env, Address, Address, Address, SpendSaveClient<'static
 
     let admin = Address::generate(&env);
     let user = Address::generate(&env);
-    let issuer = Address::generate(&env);
-    let asset = env.register_stellar_asset_contract_v2(issuer);
-    let token_addr = asset.address();
-    let token_admin = StellarAssetClient::new(&env, &token_addr);
-    token_admin.mint(&user, &10_000_000_000_i128); // 1000 USDC
+    let (token_addr, token) = create_token_contract(&env, &admin);
+    mint_tokens(&env, &token, &user, 10_000_000_000_i128); // 1000 USDC
 
     let contract_id = env.register(SpendSave, (admin.clone(), token_addr.clone()));
     let client = SpendSaveClient::new(&env, &contract_id);

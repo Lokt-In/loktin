@@ -776,6 +776,7 @@ dependencies = [
  "mock_pool",
  "soroban-sdk",
  "stellar-xdr",
+ "test_utils",
 ]
 
 [[package]]
@@ -807,6 +808,7 @@ version = "0.0.1"
 dependencies = [
  "soroban-sdk",
  "stellar-xdr",
+ "test_utils",
 ]
 
 [[package]]
@@ -894,6 +896,7 @@ version = "0.0.1"
 dependencies = [
  "soroban-sdk",
  "stellar-xdr",
+ "test_utils",
 ]
 
 [[package]]
@@ -1351,6 +1354,7 @@ version = "0.0.1"
 dependencies = [
  "soroban-sdk",
  "stellar-xdr",
+ "test_utils",
 ]
 
 [[package]]
@@ -1445,6 +1449,14 @@ dependencies = [
  "mock_pool",
  "soroban-sdk",
  "stellar-xdr",
+ "test_utils",
+]
+
+[[package]]
+name = "test_utils"
+version = "0.0.1"
+dependencies = [
+ "soroban-sdk",
 ]
 
 [[package]]

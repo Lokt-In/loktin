@@ -5,6 +5,7 @@ use super::*;
 use mock_pool::{MockPool, MockPoolClient};
 use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::{token::StellarAssetClient, Env, String};
+use test_utils::{create_token_contract, mint_tokens};
 
 const PERIOD_WEEK: u64 = 604_800;
 const ONE_YEAR: u64 = 31_536_000;
@@ -31,13 +32,8 @@ fn setup() -> (Env, Address, Address, Address, TargetSavingsClient<'static>) {
     let user = Address::generate(&env);
 
     // Stellar Asset Contract for the test token
-    let issuer = Address::generate(&env);
-    let asset = env.register_stellar_asset_contract_v2(issuer.clone());
-    let token_addr = asset.address();
-    let token_admin = StellarAssetClient::new(&env, &token_addr);
-
-    // Mint some USDC to the user
-    token_admin.mint(&user, &10_000_000_000_i128); // 1000 USDC (7 decimals)
+    let (token_addr, token) = create_token_contract(&env, &admin);
+    mint_tokens(&env, &token, &user, 10_000_000_000_i128); // 1000 USDC (7 decimals)
 
     let contract_id = env.register(TargetSavings, (admin.clone(), token_addr.clone()));
     let client = TargetSavingsClient::new(&env, &contract_id);

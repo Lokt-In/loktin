@@ -3,7 +3,8 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::testutils::{Address as _, Ledger};
-use soroban_sdk::{token::StellarAssetClient, Env};
+use soroban_sdk::Env;
+use test_utils::{assert_solvable, create_token_contract, mint_tokens};
 
 const SECONDS_PER_YEAR_U64: u64 = 31_536_000;
 
@@ -15,12 +16,9 @@ fn setup() -> (Env, Address, Address, Address, MockPoolClient<'static>) {
     let admin = Address::generate(&env);
     let supplier = Address::generate(&env);
 
-    let issuer = Address::generate(&env);
-    let asset = env.register_stellar_asset_contract_v2(issuer.clone());
-    let token_addr = asset.address();
-    let token_admin = StellarAssetClient::new(&env, &token_addr);
-    token_admin.mint(&supplier, &10_000_000_000_i128); // 1000 USDC (7 decimals)
-    token_admin.mint(&admin, &10_000_000_000_i128); // 1000 USDC for the reserve
+    let (token_addr, token) = create_token_contract(&env, &admin);
+    mint_tokens(&env, &token, &supplier, 10_000_000_000_i128); // 1000 USDC (7 decimals)
+    mint_tokens(&env, &token, &admin, 10_000_000_000_i128); // 1000 USDC for the reserve
 
     // 10% APY (1000 bps)
     let contract_id = env.register(MockPool, (admin.clone(), token_addr.clone(), 1000u32));
@@ -35,6 +33,19 @@ fn test_supply_records_principal() {
     client.supply(&supplier, &1_000_000_000); // 100 USDC
     assert_eq!(client.get_principal(&supplier), 1_000_000_000);
     assert_eq!(client.get_position(&supplier), 1_000_000_000); // no time elapsed yet
+}
+
+#[test]
+fn test_multiple_users_remain_solvable() {
+    let (env, _admin, supplier, token_addr, client) = setup();
+    let second = Address::generate(&env);
+    let token = soroban_sdk::token::TokenClient::new(&env, &token_addr);
+    mint_tokens(&env, &token, &second, 1_000_000_000);
+
+    client.supply(&supplier, &1_000_000_000);
+    client.supply(&second, &1_000_000_000);
+
+    assert_solvable(&env, &token_addr, &client.address, 2_000_000_000);
 }
 
 #[test]
