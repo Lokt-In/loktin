@@ -7,9 +7,12 @@ mod types;
 
 use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
 use soroban_sdk::{
-    contract, contractclient, contractimpl, symbol_short, token, vec, Address, Env, IntoVal, Map,
-    Vec,
+    contract, contractclient, contractimpl, panic_with_error, symbol_short, token, vec, Address,
+    Env, IntoVal, Map, Vec,
 };
+use stellar_access::access_control::{self as access_control, AccessControl, AccessControlError};
+use stellar_macros::{default_impl, only_role, when_not_paused};
+use stellar_contract_utils::pausable::{self as pausable, Pausable};
 
 use error::Error;
 use types::{DataKey, Lock};
@@ -40,11 +43,22 @@ pub struct LockedIn;
 
 #[contractimpl]
 impl LockedIn {
-    pub fn __constructor(env: Env, admin: Address, usdc_token: Address) {
+    /// `admin` is the cold, offline address that controls config, role grants and
+    /// pause. `fee_recipient` is a completely separate address that only ever
+    /// receives income: it defaults to *nothing* (`None`) and never to `admin`.
+    pub fn __constructor(
+        env: Env,
+        admin: Address,
+        fee_recipient: Option<Address>,
+        usdc_token: Address,
+    ) {
         admin.require_auth();
-        env.storage().instance().set(&DataKey::Admin, &admin);
+        access_control::set_admin(&env, &admin);
         env.storage().instance().set(&DataKey::UsdcToken, &usdc_token);
         env.storage().instance().set(&DataKey::LockCounter, &0u64);
+        if let Some(recipient) = fee_recipient {
+            env.storage().instance().set(&DataKey::FeeRecipient, &recipient);
+        }
 
         // Default APY tiers: 1mo=4%, 3mo=6%, 6mo=8%, 12mo=10%
         let mut tiers: Map<u32, u32> = Map::new(&env);
@@ -56,14 +70,19 @@ impl LockedIn {
     }
 
     // ── Admin ──
+    //
+    // Admin functions never rely on `require_auth` alone: they compare the
+    // explicit `caller` against the address stored by `set_admin`, so a keeper
+    // key (or any other key) is rejected even when the host would accept a
+    // signature. Both `require_auth` and the identity check run.
 
-    pub fn admin(env: Env) -> Result<Address, Error> {
-        env.storage().instance().get(&DataKey::Admin).ok_or(Error::AdminNotSet)
-    }
-
-    pub fn set_apy_tier(env: Env, duration_months: u32, apy_basis_points: u32) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
+    pub fn set_apy_tier(
+        env: Env,
+        caller: Address,
+        duration_months: u32,
+        apy_basis_points: u32,
+    ) -> Result<(), Error> {
+        Self::require_admin(&env, &caller);
         let mut tiers: Map<u32, u32> = env.storage().instance().get(&DataKey::ApyTiers).unwrap();
         tiers.set(duration_months, apy_basis_points);
         env.storage().instance().set(&DataKey::ApyTiers, &tiers);
@@ -87,9 +106,8 @@ impl LockedIn {
     // Set (or update) the Blend pool address. Admin-only; set after deploy so the
     // pool and this contract can be deployed in any order, and so the pool can be
     // swapped (mock -> real Blend) without redeploying this contract.
-    pub fn set_pool(env: Env, pool: Address) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
+    pub fn set_pool(env: Env, caller: Address, pool: Address) -> Result<(), Error> {
+        Self::require_admin(&env, &caller);
         env.storage().instance().set(&DataKey::Pool, &pool);
         Ok(())
     }
@@ -98,10 +116,78 @@ impl LockedIn {
         Self::pool_addr(&env)
     }
 
+    // Set or clear the fee recipient. Admin-only. Clearing is allowed and leaves
+    // the contract with no fee recipient (it never falls back to the admin).
+    pub fn set_fee_recipient(
+        env: Env,
+        caller: Address,
+        recipient: Option<Address>,
+    ) -> Result<(), Error> {
+        Self::require_admin(&env, &caller);
+        match recipient {
+            Some(recipient) => env.storage().instance().set(&DataKey::FeeRecipient, &recipient),
+            None => env.storage().instance().remove(&DataKey::FeeRecipient),
+        }
+        Ok(())
+    }
+
+    pub fn fee_recipient(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::FeeRecipient)
+    }
+
+    // ── Keeper ──
+    //
+    // Only the scheduled Blend sweeps. The caller must hold the `keeper` role.
+
+    // Supply `amount` of idle USDC from this contract into the pool.
+    #[only_role(caller, "keeper")]
+    pub fn deposit_to_blend(env: Env, caller: Address, amount: i128) -> Result<(), Error> {
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        let pool = Self::pool_addr(&env)?;
+        let token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
+        let self_addr = env.current_contract_address();
+
+        // `pool.supply` makes a nested `token.transfer(self -> pool)` that requires
+        // this contract's auth from inside the pool call. Pre-authorize exactly that
+        // sub-invocation as the current contract.
+        env.authorize_as_current_contract(vec![
+            &env,
+            InvokerContractAuthEntry::Contract(SubContractInvocation {
+                context: ContractContext {
+                    contract: token.clone(),
+                    fn_name: symbol_short!("transfer"),
+                    args: (self_addr.clone(), pool.clone(), amount).into_val(&env),
+                },
+                sub_invocations: vec![&env],
+            }),
+        ]);
+
+        PoolClient::new(&env, &pool).supply(&self_addr, &amount);
+        events::BlendDeposit { amount }.publish(&env);
+        Ok(())
+    }
+
+    // Withdraw `amount` of USDC from the pool back into this contract.
+    #[only_role(caller, "keeper")]
+    pub fn withdraw_from_blend(env: Env, caller: Address, amount: i128) -> Result<(), Error> {
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        let pool = Self::pool_addr(&env)?;
+        // The pool is the direct caller of the token on the way out, so no
+        // authorize_as_current_contract is needed here.
+        PoolClient::new(&env, &pool).withdraw(&env.current_contract_address(), &amount);
+        events::BlendWithdraw { amount }.publish(&env);
+        Ok(())
+    }
+
     // ── for users ──
 
     // Lock USDC for a fixed duration. Returns the lock id.
     // Computes and stores projected_yield (display only for now).
+    #[when_not_paused]
     pub fn lock(env: Env, user: Address, amount: i128, duration_months: u32) -> Result<u64, Error> {
         user.require_auth();
         if amount <= 0 {
@@ -151,6 +237,7 @@ impl LockedIn {
 
     // Unlock and return principal. Reverts if before end_date.
     // (Yield from Blend is added when Blend integration is live.)
+    #[when_not_paused]
     pub fn unlock(env: Env, user: Address, lock_id: u64) -> Result<i128, Error> {
         user.require_auth();
         let mut lock = Self::get_lock(env.clone(), lock_id)?;
@@ -205,6 +292,7 @@ impl LockedIn {
     }
 
     // Read functions
+    // These stay callable while the contract is paused.
 
     pub fn get_lock(env: Env, lock_id: u64) -> Result<Lock, Error> {
         env.storage().persistent().get(&DataKey::Lock(lock_id)).ok_or(Error::LockNotFound)
@@ -214,56 +302,6 @@ impl LockedIn {
         env.storage().persistent()
             .get(&DataKey::UserLocks(user))
             .unwrap_or_else(|| Vec::new(&env))
-    }
-
-    // ── Blend integration ──
-    // Keeper-driven: move idle USDC into the pool to earn yield, pull it back on
-    // demand, and read the contract's aggregate pool position.
-
-    // Supply `amount` of idle USDC from this contract into the pool.
-    pub fn deposit_to_blend(env: Env, amount: i128) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
-        if amount <= 0 {
-            return Err(Error::InvalidAmount);
-        }
-        let pool = Self::pool_addr(&env)?;
-        let token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
-        let self_addr = env.current_contract_address();
-
-        // `pool.supply` makes a nested `token.transfer(self -> pool)` that requires
-        // this contract's auth from inside the pool call. Pre-authorize exactly that
-        // sub-invocation as the current contract.
-        env.authorize_as_current_contract(vec![
-            &env,
-            InvokerContractAuthEntry::Contract(SubContractInvocation {
-                context: ContractContext {
-                    contract: token.clone(),
-                    fn_name: symbol_short!("transfer"),
-                    args: (self_addr.clone(), pool.clone(), amount).into_val(&env),
-                },
-                sub_invocations: vec![&env],
-            }),
-        ]);
-
-        PoolClient::new(&env, &pool).supply(&self_addr, &amount);
-        events::BlendDeposit { amount }.publish(&env);
-        Ok(())
-    }
-
-    // Withdraw `amount` of USDC from the pool back into this contract.
-    pub fn withdraw_from_blend(env: Env, amount: i128) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
-        if amount <= 0 {
-            return Err(Error::InvalidAmount);
-        }
-        let pool = Self::pool_addr(&env)?;
-        // The pool is the direct caller of the token on the way out, so no
-        // authorize_as_current_contract is needed here.
-        PoolClient::new(&env, &pool).withdraw(&env.current_contract_address(), &amount);
-        events::BlendWithdraw { amount }.publish(&env);
-        Ok(())
     }
 
     // This contract's current pool position (principal + accrued yield). 0 if unset.
@@ -277,6 +315,19 @@ impl LockedIn {
     }
 
     // Internal functions
+
+    // Admin identity check: the explicit caller must be the address set by
+    // `set_admin` (so two-step admin transfer is automatically respected) and
+    // must also authenticate. Unlike `require_auth` alone this rejects any other
+    // key, including a valid keeper key.
+    fn require_admin(env: &Env, caller: &Address) {
+        let admin = access_control::get_admin(env)
+            .unwrap_or_else(|| panic_with_error!(env, AccessControlError::AdminNotSet));
+        if *caller != admin {
+            panic_with_error!(env, AccessControlError::Unauthorized);
+        }
+        caller.require_auth();
+    }
 
     fn pool_addr(env: &Env) -> Result<Address, Error> {
         env.storage().instance().get(&DataKey::Pool).ok_or(Error::PoolNotSet)
@@ -298,3 +349,27 @@ impl LockedIn {
         env.storage().persistent().extend_ttl(key, LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND);
     }
 }
+
+// OZ `Pausable`: admin-only emergency stop. Reads stay callable while paused and
+// admin functions (`pause`/`unpause` included) are never pause-guarded.
+#[contractimpl]
+impl Pausable for LockedIn {
+    fn paused(e: &Env) -> bool {
+        pausable::paused(e)
+    }
+
+    fn pause(e: &Env, caller: Address) {
+        Self::require_admin(e, &caller);
+        pausable::pause(e);
+    }
+
+    fn unpause(e: &Env, caller: Address) {
+        Self::require_admin(e, &caller);
+        pausable::unpause(e);
+    }
+}
+
+// OZ `AccessControl` (roles, role grants, two-step admin transfer).
+#[default_impl]
+#[contractimpl]
+impl AccessControl for LockedIn {}

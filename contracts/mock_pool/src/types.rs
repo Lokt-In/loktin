@@ -13,8 +13,10 @@ pub struct Position {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
-    Admin,
+    // NOTE: the admin address and all roles are owned by OpenZeppelin's
+    // AccessControl module (`stellar_access::access_control`), not by this DataKey.
     UsdcToken,
+    FeeRecipient, // Option<Address>: receives income; unset (None) by default
     ApyBps,
     Position(Address),
 }
