@@ -10,39 +10,43 @@ repository = "https://github.com/Lokt-In/loktin"
 version = "0.0.1"
 
 [workspace.dependencies.soroban-sdk]
-version = "23.0.2"
+version = "26.1.0"
+
+[workspace.dependencies.stellar-xdr]
+version = "26.0.1"
+features = ["curr", "serde"]
 
 [workspace.dependencies.stellar-access]
 git = "https://github.com/OpenZeppelin/stellar-contracts"
-tag = "v0.5.1"
+tag = "v0.7.2"
 
 [workspace.dependencies.stellar-default-impl-macro]
 git = "https://github.com/OpenZeppelin/stellar-contracts"
-tag = "v0.3.0"
+tag = "v0.7.2"
 
 [workspace.dependencies.stellar-fungible]
 git = "https://github.com/OpenZeppelin/stellar-contracts"
-tag = "v0.3.0"
+tag = "v0.7.2"
 
 [workspace.dependencies.stellar-macros]
 git = "https://github.com/OpenZeppelin/stellar-contracts"
-tag = "v0.5.1"
+tag = "v0.7.2"
 
 [workspace.dependencies.stellar-non-fungible]
 git = "https://github.com/OpenZeppelin/stellar-contracts"
-tag = "v0.3.0"
+tag = "v0.7.2"
 
 [workspace.dependencies.stellar-pausable]
 git = "https://github.com/OpenZeppelin/stellar-contracts"
-tag = "v0.3.0"
+tag = "v0.7.2"
 
 [workspace.dependencies.stellar-pausable-macros]
 git = "https://github.com/OpenZeppelin/stellar-contracts"
-tag = "v0.3.0"
+tag = "v0.7.2"
 
 [workspace.dependencies.stellar-tokens]
 git = "https://github.com/OpenZeppelin/stellar-contracts"
-tag = "v0.5.1"
+tag = "v0.7.2"
 
 [profile.release]
 opt-level = "z"

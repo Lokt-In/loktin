@@ -1,4 +1,5 @@
 #![cfg(test)]
+extern crate std;
 
 use super::*;
 use soroban_sdk::{
@@ -36,7 +37,7 @@ fn mint_tokens(env: &Env, token: &TokenClient, to: &Address, amount: i128) {
 fn set_ledger_time(env: &Env, timestamp: u64, sequence: u32) {
     env.ledger().set(LedgerInfo {
         timestamp,
-        protocol_version: 23,
+        protocol_version: 26,
         sequence_number: sequence,
         network_id: Default::default(),
         base_reserve: 10,
