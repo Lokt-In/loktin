@@ -775,6 +775,9 @@ version = "0.0.1"
 dependencies = [
  "mock_pool",
  "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
  "stellar-xdr",
 ]
 
@@ -806,6 +809,9 @@ name = "mock_pool"
 version = "0.0.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
  "stellar-xdr",
 ]
 
@@ -1350,6 +1356,9 @@ name = "spend_save"
 version = "0.0.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
  "stellar-xdr",
 ]
 
@@ -1374,6 +1383,32 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stellar-access"
+version = "0.5.1"
+source = "git+https://github.com/OpenZeppelin/stellar-contracts?tag=v0.5.1#372a162a6df8aed108befa5573d30a8ca49cb271"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "stellar-contract-utils"
+version = "0.5.1"
+source = "git+https://github.com/OpenZeppelin/stellar-contracts?tag=v0.5.1#372a162a6df8aed108befa5573d30a8ca49cb271"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "stellar-macros"
+version = "0.5.1"
+source = "git+https://github.com/OpenZeppelin/stellar-contracts?tag=v0.5.1#372a162a6df8aed108befa5573d30a8ca49cb271"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
+]
 
 [[package]]
 name = "stellar-strkey"
@@ -1444,6 +1479,9 @@ version = "0.0.1"
 dependencies = [
  "mock_pool",
  "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
  "stellar-xdr",
 ]
 

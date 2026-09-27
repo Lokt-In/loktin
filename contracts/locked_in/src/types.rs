@@ -17,11 +17,13 @@ pub struct Lock {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
-    Admin,
+    // NOTE: the admin address is owned by OpenZeppelin's AccessControl module
+    // (`stellar_access::access_control`), not by this DataKey.
     UsdcToken,
     LockCounter,
     Lock(u64),
     UserLocks(Address),
     ApyTiers,
-    Pool, // Address of the (mock) Blend pool, set post-deploy via set_pool
+    Pool,          // Address of the (mock) Blend pool, set post-deploy via set_pool
+    FeeRecipient,  // Option<Address>: receives income; unset (None) by default
 }

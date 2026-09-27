@@ -24,10 +24,10 @@ pub struct TargetGoal {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
-    Admin,
-    Keeper,
+    // NOTE: the admin address and the keeper role are owned by OpenZeppelin's
+    // AccessControl module (`stellar_access::access_control`), not by this DataKey.
     UsdcToken,
-    FeeRecipient,
+    FeeRecipient, // Option<Address>: receives the early-withdrawal fee; unset (None) by default
     GoalCounter,
     Goal(u64),
     UserGoals(Address),

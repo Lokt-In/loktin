@@ -6,9 +6,12 @@ mod types;
 
 use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
 use soroban_sdk::{
-    contract, contractclient, contractimpl, symbol_short, token, vec, Address, Env, IntoVal, String,
-    Vec,
+    contract, contractclient, contractimpl, panic_with_error, symbol_short, token, vec, Address,
+    Env, IntoVal, String, Vec,
 };
+use stellar_access::access_control::{self as access_control, AccessControl, AccessControlError};
+use stellar_macros::{default_impl, only_role, when_not_paused};
+use stellar_contract_utils::pausable::{self as pausable, Pausable};
 
 use error::Error;
 use types::{DataKey, TargetGoal};
@@ -41,52 +44,35 @@ pub struct TargetSavings;
 #[contractimpl]
 impl TargetSavings {
     // ── Constructor ──
-    pub fn __constructor(env: Env, admin: Address, usdc_token: Address) {
+
+    /// `admin` is the cold, offline address controlling config, role grants and
+    /// pause. `fee_recipient` is a distinct address that only receives the early
+    /// withdrawal fee: it defaults to *nothing* (`None`), never to `admin`.
+    pub fn __constructor(
+        env: Env,
+        admin: Address,
+        fee_recipient: Option<Address>,
+        usdc_token: Address,
+    ) {
         admin.require_auth();
-        env.storage().instance().set(&DataKey::Admin, &admin);
+        access_control::set_admin(&env, &admin);
         env.storage().instance().set(&DataKey::UsdcToken, &usdc_token);
-        env.storage().instance().set(&DataKey::FeeRecipient, &admin);
-        env.storage().instance().set(&DataKey::Keeper, &admin); // admin is keeper by default
         env.storage().instance().set(&DataKey::GoalCounter, &0u64);
+        if let Some(recipient) = fee_recipient {
+            env.storage().instance().set(&DataKey::FeeRecipient, &recipient);
+        }
     }
 
-    // Admin / config
-
-    pub fn admin(env: Env) -> Result<Address, Error> {
-        env.storage().instance().get(&DataKey::Admin).ok_or(Error::AdminNotSet)
-    }
-
-    pub fn set_keeper(env: Env, keeper: Address) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
-        env.storage().instance().set(&DataKey::Keeper, &keeper);
-        Ok(())
-    }
-
-    pub fn keeper(env: Env) -> Address {
-        env.storage().instance().get(&DataKey::Keeper).unwrap()
-    }
-
-    pub fn set_fee_recipient(env: Env, recipient: Address) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
-        env.storage().instance().set(&DataKey::FeeRecipient, &recipient);
-        Ok(())
-    }
-
-    pub fn fee_recipient(env: Env) -> Address {
-        env.storage().instance().get(&DataKey::FeeRecipient).unwrap()
-    }
-
-    pub fn usdc_token(env: Env) -> Address {
-        env.storage().instance().get(&DataKey::UsdcToken).unwrap()
-    }
+    // ── Admin ──
+    //
+    // Admin functions compare the explicit `caller` against the address stored by
+    // `set_admin` (so two-step transfer is respected) *and* require its auth, so a
+    // keeper key is rejected even when the host would accept a signature.
 
     // Set (or update) the Blend pool address. Admin-only; set after deploy so the
     // pool can be swapped (mock -> real Blend) without redeploying this contract.
-    pub fn set_pool(env: Env, pool: Address) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
+    pub fn set_pool(env: Env, caller: Address, pool: Address) -> Result<(), Error> {
+        Self::require_admin(&env, &caller);
         env.storage().instance().set(&DataKey::Pool, &pool);
         Ok(())
     }
@@ -95,11 +81,33 @@ impl TargetSavings {
         Self::pool_addr(&env)
     }
 
+    // Set or clear the fee recipient. Admin-only. Clearing leaves the contract
+    // with no fee recipient (it never falls back to the admin).
+    pub fn set_fee_recipient(
+        env: Env,
+        caller: Address,
+        recipient: Option<Address>,
+    ) -> Result<(), Error> {
+        Self::require_admin(&env, &caller);
+        match recipient {
+            Some(recipient) => env.storage().instance().set(&DataKey::FeeRecipient, &recipient),
+            None => env.storage().instance().remove(&DataKey::FeeRecipient),
+        }
+        Ok(())
+    }
+
+    pub fn fee_recipient(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::FeeRecipient)
+    }
+
+    pub fn usdc_token(env: Env) -> Address {
+        env.storage().instance().get(&DataKey::UsdcToken).unwrap()
+    }
+
     // APY (bps) used to accrue per-goal interest. Should match the pool's APY so
     // the pool can cover payouts; admin-settable for that reason.
-    pub fn set_yield_apy(env: Env, apy_bps: u32) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
+    pub fn set_yield_apy(env: Env, caller: Address, apy_bps: u32) -> Result<(), Error> {
+        Self::require_admin(&env, &caller);
         env.storage().instance().set(&DataKey::YieldApyBps, &apy_bps);
         Ok(())
     }
@@ -108,10 +116,70 @@ impl TargetSavings {
         Self::yield_apy(&env)
     }
 
-    // User functions
+    // ── Keeper ──
+    //
+    // The only scheduled function: pull the next period from a goal's wallet. The
+    // caller must hold the `keeper` role.
+
+    /// Process a single period for a goal: pulls `period_amount` from the user's wallet
+    /// via `transfer_from`. If the user lacks balance/allowance, logs a missed period.
+    #[only_role(caller, "keeper")]
+    pub fn process_period(env: Env, caller: Address, target_id: u64) -> Result<(), Error> {
+        let mut goal = Self::get_target(env.clone(), target_id)?;
+        if goal.is_complete {
+            return Err(Error::GoalAlreadyComplete);
+        }
+
+        let now = env.ledger().timestamp();
+        let next_due = goal.last_deposit_date + goal.period_seconds;
+        if now < next_due {
+            return Err(Error::PeriodNotDue);
+        }
+
+        let token = Self::token_client(&env);
+        let user_balance = token.balance(&goal.user);
+        let allowance = token.allowance(&goal.user, &env.current_contract_address());
+
+        if user_balance < goal.period_amount || allowance < goal.period_amount {
+            // Skip + log
+            goal.missed_periods += 1;
+            goal.last_deposit_date = next_due;
+            env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
+            Self::extend_ttl(&env, &DataKey::Goal(target_id));
+            events::Missed { target_id, user: goal.user.clone() }.publish(&env);
+            return Ok(());
+        }
+
+        // Pull funds via transfer_from
+        token.transfer_from(
+            &env.current_contract_address(),
+            &goal.user,
+            &env.current_contract_address(),
+            &goal.period_amount,
+        );
+
+        // Lock in interest on the existing balance before it grows.
+        Self::settle_goal_yield(&env, &mut goal, now);
+        goal.deposited += goal.period_amount;
+        goal.last_deposit_date = next_due;
+
+        // Auto-complete if target met
+        if goal.deposited >= goal.target_amount && now >= goal.end_date {
+            // Don't auto-withdraw, just keep open until user calls withdraw
+        }
+
+        env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
+        Self::extend_ttl(&env, &DataKey::Goal(target_id));
+        events::PeriodDeposit { target_id, user: goal.user.clone(), amount: goal.period_amount }
+            .publish(&env);
+        Ok(())
+    }
+
+    // ── User functions ──
 
     // Create a new target savings goal. The user must have approved the contract
     // to spend USDC up to `target_amount` on the USDC token contract.
+    #[when_not_paused]
     pub fn create_target(
         env: Env,
         user: Address,
@@ -168,7 +236,8 @@ impl TargetSavings {
         Ok(id)
     }
 
-    // Manually deposit additional funds into a goal (to.
+    // Manually deposit additional funds into a goal.
+    #[when_not_paused]
     pub fn manual_deposit(env: Env, user: Address, target_id: u64, amount: i128) -> Result<(), Error> {
         user.require_auth();
         if amount <= 0 {
@@ -196,6 +265,7 @@ impl TargetSavings {
     }
 
     /// Withdraw entire goal balance. Charges 1% forfeit if before `end_date`.
+    #[when_not_paused]
     pub fn withdraw(env: Env, user: Address, target_id: u64) -> Result<i128, Error> {
         user.require_auth();
         let mut goal = Self::get_target(env.clone(), target_id)?;
@@ -230,8 +300,12 @@ impl TargetSavings {
             token.transfer(&env.current_contract_address(), &user, &to_user);
         }
         if forfeit > 0 {
-            let recipient = Self::fee_recipient(env.clone());
-            token.transfer(&env.current_contract_address(), &recipient, &forfeit);
+            // Only pays out when a fee recipient was configured; it never falls
+            // back to the admin, so with no recipient configured the fee stays in
+            // the vault.
+            if let Some(recipient) = Self::fee_recipient(env.clone()) {
+                token.transfer(&env.current_contract_address(), &recipient, &forfeit);
+            }
         }
 
         goal.deposited = 0;
@@ -244,65 +318,8 @@ impl TargetSavings {
         Ok(to_user)
     }
 
-    // Keeper
-
-    /// Process a single period for a goal: pulls `period_amount` from the user's wallet
-    /// via `transfer_from`. If the user lacks balance/allowance, logs a missed period.
-    /// Callable only by the keeper (admin can be set as keeper).
-    pub fn process_period(env: Env, target_id: u64) -> Result<(), Error> {
-        let keeper = Self::keeper(env.clone());
-        keeper.require_auth();
-
-        let mut goal = Self::get_target(env.clone(), target_id)?;
-        if goal.is_complete {
-            return Err(Error::GoalAlreadyComplete);
-        }
-
-        let now = env.ledger().timestamp();
-        let next_due = goal.last_deposit_date + goal.period_seconds;
-        if now < next_due {
-            return Err(Error::PeriodNotDue);
-        }
-
-        let token = Self::token_client(&env);
-        let user_balance = token.balance(&goal.user);
-        let allowance = token.allowance(&goal.user, &env.current_contract_address());
-
-        if user_balance < goal.period_amount || allowance < goal.period_amount {
-            // Skip + log
-            goal.missed_periods += 1;
-            goal.last_deposit_date = next_due;
-            env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
-            Self::extend_ttl(&env, &DataKey::Goal(target_id));
-            events::Missed { target_id, user: goal.user.clone() }.publish(&env);
-            return Ok(());
-        }
-
-        // Pull funds via transfer_from
-        token.transfer_from(
-            &env.current_contract_address(),
-            &goal.user,
-            &env.current_contract_address(),
-            &goal.period_amount,
-        );
-
-        // Lock in interest on the existing balance before it grows.
-        Self::settle_goal_yield(&env, &mut goal, now);
-        goal.deposited += goal.period_amount;
-        goal.last_deposit_date = next_due;
-
-        // Auto-complete if target met
-        if goal.deposited >= goal.target_amount && now >= goal.end_date {
-            // Don't auto-withdraw, just keep open until user calls withdraw
-        }
-
-        env.storage().persistent().set(&DataKey::Goal(target_id), &goal);
-        Self::extend_ttl(&env, &DataKey::Goal(target_id));
-        events::PeriodDeposit { target_id, user: goal.user.clone(), amount: goal.period_amount }.publish(&env);
-        Ok(())
-    }
-
     // ── Reads ──
+    // These stay callable while the contract is paused.
 
     pub fn get_target(env: Env, target_id: u64) -> Result<TargetGoal, Error> {
         env.storage().persistent().get(&DataKey::Goal(target_id)).ok_or(Error::GoalNotFound)
@@ -328,9 +345,8 @@ impl TargetSavings {
     // Each goal accrues its own interest (see settle_goal_yield / get_goal_yield);
     // the pool holds the funds backing those payouts.
 
-    pub fn deposit_to_blend(env: Env, amount: i128) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
+    #[only_role(caller, "keeper")]
+    pub fn deposit_to_blend(env: Env, caller: Address, amount: i128) -> Result<(), Error> {
         if amount <= 0 {
             return Err(Error::InvalidAmount);
         }
@@ -357,9 +373,8 @@ impl TargetSavings {
         Ok(())
     }
 
-    pub fn withdraw_from_blend(env: Env, amount: i128) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
+    #[only_role(caller, "keeper")]
+    pub fn withdraw_from_blend(env: Env, caller: Address, amount: i128) -> Result<(), Error> {
         if amount <= 0 {
             return Err(Error::InvalidAmount);
         }
@@ -379,6 +394,18 @@ impl TargetSavings {
     }
 
     // ── Internal helpers ──
+
+    // Admin identity check: the explicit caller must be the address set by
+    // `set_admin` (so two-step admin transfer is automatically respected) and must
+    // also authenticate.
+    fn require_admin(env: &Env, caller: &Address) {
+        let admin = access_control::get_admin(env)
+            .unwrap_or_else(|| panic_with_error!(env, AccessControlError::AdminNotSet));
+        if *caller != admin {
+            panic_with_error!(env, AccessControlError::Unauthorized);
+        }
+        caller.require_auth();
+    }
 
     fn pool_addr(env: &Env) -> Result<Address, Error> {
         env.storage().instance().get(&DataKey::Pool).ok_or(Error::PoolNotSet)
@@ -450,6 +477,30 @@ impl TargetSavings {
         env.storage().persistent().extend_ttl(key, LEDGER_TTL_THRESHOLD, LEDGER_TTL_EXTEND);
     }
 }
+
+// OZ `Pausable`: admin-only emergency stop. Reads stay callable while paused and
+// `pause`/`unpause` are never pause-guarded.
+#[contractimpl]
+impl Pausable for TargetSavings {
+    fn paused(e: &Env) -> bool {
+        pausable::paused(e)
+    }
+
+    fn pause(e: &Env, caller: Address) {
+        Self::require_admin(e, &caller);
+        pausable::pause(e);
+    }
+
+    fn unpause(e: &Env, caller: Address) {
+        Self::require_admin(e, &caller);
+        pausable::unpause(e);
+    }
+}
+
+// OZ `AccessControl` (roles, role grants, two-step admin transfer).
+#[default_impl]
+#[contractimpl]
+impl AccessControl for TargetSavings {}
 
 #[cfg(test)]
 mod test;

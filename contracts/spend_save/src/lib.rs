@@ -4,7 +4,10 @@ mod error;
 mod events;
 mod types;
 
-use soroban_sdk::{contract, contractimpl, token, Address, Env};
+use soroban_sdk::{contract, contractimpl, panic_with_error, token, Address, Env};
+use stellar_access::access_control::{self as access_control, AccessControl, AccessControlError};
+use stellar_macros::{default_impl, only_role, when_not_paused};
+use stellar_contract_utils::pausable::{self as pausable, Pausable};
 
 use error::Error;
 use types::{DataKey, SpendSavePosition};
@@ -24,25 +27,60 @@ pub struct SpendSave;
 
 #[contractimpl]
 impl SpendSave {
-    pub fn __constructor(env: Env, admin: Address, usdc_token: Address) {
+    /// `admin` is the cold, offline address controlling config, role grants and
+    /// pause. `fee_recipient` is a distinct address that only ever receives
+    /// income: it defaults to *nothing* (`None`), never to `admin`. This
+    /// contract has no income stream yet (the whole spend stays with the user or
+    /// in the vault), so the recipient is stored and reported but not yet paid.
+    pub fn __constructor(
+        env: Env,
+        admin: Address,
+        fee_recipient: Option<Address>,
+        usdc_token: Address,
+    ) {
         admin.require_auth();
-        env.storage().instance().set(&DataKey::Admin, &admin);
+        access_control::set_admin(&env, &admin);
         env.storage().instance().set(&DataKey::UsdcToken, &usdc_token);
+        if let Some(recipient) = fee_recipient {
+            env.storage().instance().set(&DataKey::FeeRecipient, &recipient);
+        }
     }
 
     // ── Admin ──
+    //
+    // Admin functions compare the explicit `caller` against the address stored by
+    // `set_admin` (so two-step transfer is respected) *and* require its auth, so a
+    // keeper key is rejected even when the host would accept a signature. The
+    // admin itself is read through OZ `AccessControl::get_admin`.
 
-    pub fn admin(env: Env) -> Result<Address, Error> {
-        env.storage().instance().get(&DataKey::Admin).ok_or(Error::AdminNotSet)
+    // Set or clear the fee recipient. Admin-only. Clearing leaves the contract
+    // with no fee recipient (it never falls back to the admin).
+    pub fn set_fee_recipient(
+        env: Env,
+        caller: Address,
+        recipient: Option<Address>,
+    ) -> Result<(), Error> {
+        Self::require_admin(&env, &caller);
+        match recipient {
+            Some(recipient) => env.storage().instance().set(&DataKey::FeeRecipient, &recipient),
+            None => env.storage().instance().remove(&DataKey::FeeRecipient),
+        }
+        Ok(())
+    }
+
+    pub fn fee_recipient(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::FeeRecipient)
     }
 
     pub fn usdc_token(env: Env) -> Address {
         env.storage().instance().get(&DataKey::UsdcToken).unwrap()
     }
 
-    // User functions
+    // ── User functions ──
+    // State-changing and user-facing: all pause-guarded.
 
     // Enroll or update save percentage (basis points: 100=1%, 5000=50%).
+    #[when_not_paused]
     pub fn enroll(env: Env, user: Address, save_percentage_bps: u32) -> Result<(), Error> {
         user.require_auth();
         if save_percentage_bps < 100 || save_percentage_bps > 5000 {
@@ -74,6 +112,7 @@ impl SpendSave {
 
     // Spend USDC through Loktin: routes (1-pct) to recipient, (pct) to vault.
     // Pulls `total_amount` from user's wallet. Returns (sent_to_recipient, saved).
+    #[when_not_paused]
     pub fn spend(env: Env, user: Address, recipient: Address, total_amount: i128) -> Result<(i128, i128), Error> {
         user.require_auth();
         if total_amount <= 0 {
@@ -105,6 +144,7 @@ impl SpendSave {
     }
 
     // Withdraw from saved_balance. Reverts unless current UTC date is the 28th.
+    #[when_not_paused]
     pub fn withdraw(env: Env, user: Address, amount: i128) -> Result<(), Error> {
         user.require_auth();
         if amount <= 0 {
@@ -131,7 +171,8 @@ impl SpendSave {
         Ok(())
     }
 
-    // Read functions
+    // ── Reads ──
+    // These stay callable while the contract is paused.
 
     pub fn get_position(env: Env, user: Address) -> Result<SpendSavePosition, Error> {
         env.storage().persistent().get(&DataKey::Position(user)).ok_or(Error::NotEnrolled)
@@ -147,18 +188,26 @@ impl SpendSave {
         Self::utc_day_of_month(env.ledger().timestamp())
     }
 
-    // Blend integration stubs
+    // ── Keeper ──
+    //
+    // The scheduled Blend sweeps. The caller must hold the `keeper` role.
+    // (Blend itself is not wired into this contract yet, so these still only
+    // record intent; the authorization model is what changes here.)
 
-    pub fn deposit_to_blend(env: Env, amount: i128) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
+    #[only_role(caller, "keeper")]
+    pub fn deposit_to_blend(env: Env, caller: Address, amount: i128) -> Result<(), Error> {
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
         events::BlendDeposit { amount }.publish(&env);
         Ok(())
     }
 
-    pub fn withdraw_from_blend(env: Env, amount: i128) -> Result<(), Error> {
-        let admin = Self::admin(env.clone())?;
-        admin.require_auth();
+    #[only_role(caller, "keeper")]
+    pub fn withdraw_from_blend(env: Env, caller: Address, amount: i128) -> Result<(), Error> {
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
         events::BlendWithdraw { amount }.publish(&env);
         Ok(())
     }
@@ -167,7 +216,19 @@ impl SpendSave {
         0
     }
 
-    // Internal helpers
+    // ── Internal helpers ──
+
+    // Admin identity check: the explicit caller must be the address set by
+    // `set_admin` (so two-step admin transfer is automatically respected) and must
+    // also authenticate.
+    fn require_admin(env: &Env, caller: &Address) {
+        let admin = access_control::get_admin(env)
+            .unwrap_or_else(|| panic_with_error!(env, AccessControlError::AdminNotSet));
+        if *caller != admin {
+            panic_with_error!(env, AccessControlError::Unauthorized);
+        }
+        caller.require_auth();
+    }
 
     fn token_client(env: &Env) -> token::TokenClient<'_> {
         let token: Address = env.storage().instance().get(&DataKey::UsdcToken).unwrap();
@@ -197,6 +258,30 @@ impl SpendSave {
         d
     }
 }
+
+// OZ `Pausable`: admin-only emergency stop. Reads stay callable while paused and
+// `pause`/`unpause` are never pause-guarded.
+#[contractimpl]
+impl Pausable for SpendSave {
+    fn paused(e: &Env) -> bool {
+        pausable::paused(e)
+    }
+
+    fn pause(e: &Env, caller: Address) {
+        Self::require_admin(e, &caller);
+        pausable::pause(e);
+    }
+
+    fn unpause(e: &Env, caller: Address) {
+        Self::require_admin(e, &caller);
+        pausable::unpause(e);
+    }
+}
+
+// OZ `AccessControl` (roles, role grants, two-step admin transfer).
+#[default_impl]
+#[contractimpl]
+impl AccessControl for SpendSave {}
 
 #[cfg(test)]
 mod test;

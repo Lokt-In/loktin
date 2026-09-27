@@ -16,6 +16,19 @@ version = "23.0.2"
 git = "https://github.com/OpenZeppelin/stellar-contracts"
 tag = "v0.5.1"
 
+# The pausable module for the `v0.5.1` line of stellar-contracts. On that tag it
+# ships inside `stellar-contract-utils` (`stellar_contract_utils::pausable`),
+# which is pinned to soroban-sdk 23 and therefore links against these contracts.
+# Tags are per-package in that repo: `stellar-access` / `stellar-macros` were
+# released on the `v0.5.1` line while the standalone `stellar-pausable` crate
+# below only exists on the `v0.3.0` line, which is pinned to soroban-sdk 22 and
+# cannot be linked from an soroban-sdk 23 contract. Unifying every OZ dependency
+# onto one tag is tracked by #35; #39 only needs the pausable module that
+# matches the `stellar-access` tag it already uses.
+[workspace.dependencies.stellar-contract-utils]
+git = "https://github.com/OpenZeppelin/stellar-contracts"
+tag = "v0.5.1"
+
 [workspace.dependencies.stellar-default-impl-macro]
 git = "https://github.com/OpenZeppelin/stellar-contracts"
 tag = "v0.3.0"
@@ -32,6 +45,8 @@ tag = "v0.5.1"
 git = "https://github.com/OpenZeppelin/stellar-contracts"
 tag = "v0.3.0"
 
+# soroban-sdk 22 line, unused by the contracts (see the note on
+# `stellar-contract-utils` above).
 [workspace.dependencies.stellar-pausable]
 git = "https://github.com/OpenZeppelin/stellar-contracts"
 tag = "v0.3.0"
