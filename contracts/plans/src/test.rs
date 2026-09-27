@@ -1,19 +1,9 @@
 #![cfg(test)]
+extern crate std;
 
 use super::*;
-use soroban_sdk::{
-    testutils::{Address as _, Ledger, LedgerInfo},
-    token::{StellarAssetClient, TokenClient},
-    Address, Env, String, Vec,
-};
-
-// Test token setup helper
-fn create_token_contract<'a>(env: &Env, admin: &Address) -> (Address, TokenClient<'a>) {
-    let stellar_asset = env.register_stellar_asset_contract_v2(admin.clone());
-    let token_address = stellar_asset.address();
-    let token = TokenClient::new(env, &token_address);
-    (token_address, token)
-}
+use soroban_sdk::{testutils::Address as _, Address, Env, String, Vec};
+use test_utils::{create_token_contract, mint_tokens, set_ledger_time};
 
 // Contract setup helper
 fn create_plans_contract<'a>(
@@ -26,25 +16,6 @@ fn create_plans_contract<'a>(
     client
 }
 
-// Helper to mint tokens to a user
-fn mint_tokens(env: &Env, token: &TokenClient, to: &Address, amount: i128) {
-    let stellar_asset = StellarAssetClient::new(env, &token.address);
-    stellar_asset.mint(to, &amount);
-}
-
-// Helper to set ledger time
-fn set_ledger_time(env: &Env, timestamp: u64, sequence: u32) {
-    env.ledger().set(LedgerInfo {
-        timestamp,
-        protocol_version: 23,
-        sequence_number: sequence,
-        network_id: Default::default(),
-        base_reserve: 10,
-        min_temp_entry_ttl: 10,
-        min_persistent_entry_ttl: 10,
-        max_entry_ttl: 3110400,
-    });
-}
 
 #[test]
 fn test_initialization() {
