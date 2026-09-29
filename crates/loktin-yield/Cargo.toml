@@ -1,0 +1,18 @@
+[package]
+name = "loktin-yield"
+description = "Share-vault accounting helpers for Loktin savings contracts"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+[lib]
+crate-type = ["lib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = "23.0.3"
+
+[dev-dependencies]
+soroban-sdk = { version = "23.0.3", features = ["testutils"] }
